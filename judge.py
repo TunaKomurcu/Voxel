@@ -11,6 +11,7 @@ separately.
 import copy
 import json
 import re
+import time
 import urllib.request
 from typing import Any, Optional
 
@@ -341,12 +342,27 @@ def call_judge(turns: list[dict], model: str = JUDGE_MODEL,
     return data
 
 
+def _wait_for_artifact(session_id: str, artifact_type: str, timeout: float = 20.0,
+                        poll_interval: float = 1.5) -> tuple[dict, Optional[str]]:
+    """AssemblyAI can take a few seconds to finalize and upload session
+    artifacts after the call ends, so a request made right on session.ended
+    may not find them yet. Polls until the artifact shows up or timeout
+    elapses; returns the last session fetched either way."""
+    deadline = time.monotonic() + timeout
+    session = fetch_session(session_id)
+    url = _artifact_url(session, artifact_type)
+    while url is None and time.monotonic() < deadline:
+        time.sleep(poll_interval)
+        session = fetch_session(session_id)
+        url = _artifact_url(session, artifact_type)
+    return session, url
+
+
 def run_judge_pass(session_id: str, model: str = JUDGE_MODEL, include_sentiment: bool = True) -> dict:
     """The single entry point the UI calls: a session id in, validated judge
     JSON out. Sentiment analysis is best-effort — a failure there (gateway
     timeout, no account access) still lets the judge pass complete."""
-    session = fetch_session(session_id)
-    timeline_url = _artifact_url(session, "timeline")
+    session, timeline_url = _wait_for_artifact(session_id, "timeline")
     if timeline_url is None:
         raise ValueError(f"Session {session_id} has no timeline artifact yet (status={session.get('status')})")
     with urllib.request.urlopen(timeline_url) as res:

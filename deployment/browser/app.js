@@ -142,7 +142,7 @@ const PLAYBACK_WORKLET = `
 const blobUrl = (code) =>
   URL.createObjectURL(new Blob([code], { type: 'application/javascript' }))
 
-let ws, captureCtx, playbackCtx, playback, mic, callStart, timer
+let ws, captureCtx, playbackCtx, playback, mic, callStart, timer, sessionId
 
 // --- microphones ---
 // Labels stay empty until mic permission is granted, so this runs again after
@@ -219,6 +219,7 @@ async function start() {
   $('btn').disabled = true
   $('mic').disabled = true
   setStatus('connecting')
+  hideResults()
 
   try {
     // The API key never reaches the page; this token expires in 60 seconds.
@@ -281,6 +282,7 @@ async function start() {
       switch (msg.type) {
         case 'session.ready':
           ready = true
+          sessionId = msg.session_id
           callStart = Date.now()
           timer = setInterval(tick, 1000)
           tick()
@@ -357,6 +359,7 @@ async function start() {
         case 'session.ended':
           logEvent('down', msg.type)
           ws.close()
+          if (sessionId) fetchJudgeResults(sessionId)
           break
 
         case 'session.error':
@@ -561,4 +564,152 @@ function logEvent(direction, type, detail) {
   while (log.children.length > 400) log.firstChild.remove()
   if (COALESCE.has(type)) open.set(key, { row, count: 1, detail, painted: 0 })
   if (atBottom) scroll(log)
+}
+
+// --- post-call feedback ---
+// The judge pass (session retrieval + sentiment + LLM scoring) can take
+// 15-45s, most of it the sentiment analysis step. These staged messages are
+// just to keep the wait from reading as a hang — there's no real progress
+// signal behind them, just a timeline that roughly matches what's happening.
+const LOADING_STAGES = [
+  [0, 'Reviewing what you said...'],
+  [5000, 'Cross-checking tone and sentiment...'],
+  [25000, 'Scoring your recovery...'],
+]
+let loadingTimers = []
+let lastSessionId = null
+
+function startLoadingStages() {
+  clearLoadingStages()
+  for (const [at, text] of LOADING_STAGES) {
+    if (at === 0) $('results-status').textContent = text
+    else loadingTimers.push(setTimeout(() => { $('results-status').textContent = text }, at))
+  }
+}
+
+function clearLoadingStages() {
+  loadingTimers.forEach(clearTimeout)
+  loadingTimers = []
+}
+
+function hideResults() {
+  clearLoadingStages()
+  $('results').hidden = true
+}
+
+function fetchJudgeResults(id) {
+  lastSessionId = id
+  $('results').hidden = false
+  $('results-body').replaceChildren()
+  $('results-error').hidden = true
+  $('results-loading').hidden = false
+  startLoadingStages()
+  fetch('/judge?session_id=' + encodeURIComponent(id))
+    .then(async (res) => {
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'request failed')
+      clearLoadingStages()
+      $('results-loading').hidden = true
+      renderJudgeResults(data)
+    })
+    .catch(() => {
+      clearLoadingStages()
+      $('results-loading').hidden = true
+      $('results-error').hidden = false
+    })
+}
+
+$('results-retry').onclick = () => { if (lastSessionId) fetchJudgeResults(lastSessionId) }
+
+const QUALITY_CLASS = { strong: 'quality-good', weak: 'quality-warn', poor: 'quality-bad' }
+
+function tag(text, cls) {
+  const el = document.createElement('span')
+  el.className = 'tag' + (cls ? ' ' + cls : '')
+  el.textContent = text
+  return el
+}
+
+function renderJudgeResults(data) {
+  const root = $('results-body')
+  root.replaceChildren()
+
+  const score = document.createElement('div')
+  score.className = 'score'
+  const num = document.createElement('span')
+  num.className = 'score-num'
+  num.textContent = data.overall_score
+  const label = document.createElement('span')
+  label.className = 'score-label'
+  label.textContent = '/ 100'
+  score.append(num, label)
+  root.append(score)
+
+  const categories = document.createElement('div')
+  categories.className = 'categories'
+  for (const [key, cat] of Object.entries(data.categories)) {
+    const row = document.createElement('div')
+    row.className = 'category'
+    const catLabel = document.createElement('div')
+    catLabel.className = 'category-label'
+    catLabel.textContent = key.replace(/_/g, ' ')
+    const barWrap = document.createElement('div')
+    barWrap.className = 'bar-wrap'
+    const bar = document.createElement('div')
+    bar.className = 'bar'
+    bar.style.width = cat.score + '%'
+    barWrap.append(bar)
+    const catScore = document.createElement('div')
+    catScore.className = 'category-score'
+    catScore.textContent = cat.score
+    const note = document.createElement('div')
+    note.className = 'category-note'
+    note.textContent = cat.note
+    row.append(catLabel, barWrap, catScore, note)
+    categories.append(row)
+  }
+  root.append(categories)
+
+  const interruptions = document.createElement('div')
+  interruptions.className = 'interruptions'
+  if (data.interruptions.length === 0) {
+    const empty = document.createElement('div')
+    empty.className = 'empty'
+    empty.textContent = 'No interruptions this call.'
+    interruptions.append(empty)
+  }
+  for (const item of data.interruptions) {
+    const card = document.createElement('div')
+    card.className = 'interruption-card'
+    const moment = document.createElement('div')
+    moment.className = 'interruption-moment'
+    moment.textContent = item.moment
+    const tags = document.createElement('div')
+    tags.className = 'interruption-tags'
+    tags.append(
+      tag(item.trigger.replace(/_/g, ' ')),
+      tag(item.recovery_quality, QUALITY_CLASS[item.recovery_quality]),
+      tag(item.recovery_pattern.replace(/_/g, ' ')),
+    )
+    const note = document.createElement('div')
+    note.className = 'interruption-note'
+    note.textContent = item.note
+    const example = document.createElement('div')
+    example.className = 'interruption-example'
+    // Verbatim, [X]/[Y] placeholders included when the judge had no real
+    // number to point to — see judge.py's sanitize_response_example.
+    example.textContent = item.better_response_example
+    card.append(moment, tags, note, example)
+    interruptions.append(card)
+  }
+  root.append(interruptions)
+
+  const suggestions = document.createElement('ul')
+  suggestions.className = 'suggestions'
+  for (const s of data.suggestions) {
+    const li = document.createElement('li')
+    li.textContent = s
+    suggestions.append(li)
+  }
+  root.append(suggestions)
 }

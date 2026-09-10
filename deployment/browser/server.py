@@ -10,6 +10,7 @@ import copy
 import json
 import os
 import sys
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -18,6 +19,7 @@ sys.path.insert(0, str(HERE.parents[1]))
 
 from lib import (ApiError, aai, load_env, publish_agent, read_agent,  # noqa: E402
                  required, stored_agent_id)
+import judge  # noqa: E402
 
 
 def resolve_agent() -> dict:
@@ -68,7 +70,22 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:  # noqa: N802
-        path = self.path.split("?")[0]
+        parsed = urllib.parse.urlsplit(self.path)
+        path = parsed.path
+        query = urllib.parse.parse_qs(parsed.query)
+        if path == "/judge":
+            session_id = (query.get("session_id") or [""])[0]
+            if not session_id:
+                self._send(400, b'{"error":"missing session_id"}', "application/json")
+                return
+            try:
+                result = judge.run_judge_pass(session_id)
+                self._send(200, json.dumps(result).encode(), "application/json")
+            except Exception as err:
+                print(f"Judge pass failed for {session_id}: {err}")
+                body = json.dumps({"error": "Could not generate feedback for this call."}).encode()
+                self._send(502, body, "application/json")
+            return
         if path == "/token":
             try:
                 token = aai("/token?product=voice_agent&expires_in_seconds=60")

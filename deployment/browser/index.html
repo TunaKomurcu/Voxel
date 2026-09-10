@@ -132,6 +132,42 @@
   #agent-body pre { font-family: var(--font-mono); font-size: 12px;
                     line-height: 1.6; color: var(--text); white-space: pre-wrap;
                     word-break: break-word; }
+
+  /* Post-call feedback. */
+  #results-loading { color: var(--text-muted); font-size: 14px; }
+  #results-error p { margin-bottom: 12px; color: var(--error); }
+
+  .score { display: flex; align-items: baseline; gap: 6px; margin-bottom: 20px; }
+  .score-num { font-family: var(--font-display); font-size: 48px;
+               color: var(--text-dark); line-height: 1; }
+  .score-label { color: var(--text-faint); font-size: 14px; }
+
+  .categories { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+  .category { display: grid; grid-template-columns: 160px 1fr 32px;
+              gap: 8px 12px; align-items: center; }
+  .category-label { font-size: 13px; color: var(--text-muted); text-transform: capitalize; }
+  .bar-wrap { height: 8px; background: var(--surface-alt); border-radius: 4px; overflow: hidden; }
+  .bar { height: 100%; background: var(--cobolt-500); }
+  .category-score { font-family: var(--font-mono); font-size: 12px;
+                     color: var(--text-muted); text-align: right; }
+  .category-note { grid-column: 1 / -1; font-size: 13px; color: var(--text-faint); }
+
+  .interruptions { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+  .interruption-card { padding: 12px; background: var(--surface-alt);
+                        border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .interruption-moment { font-weight: 600; color: var(--text-dark); margin-bottom: 6px; }
+  .interruption-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .tag { font-family: var(--font-mono); font-size: 11px; text-transform: uppercase;
+         letter-spacing: .6px; padding: 2px 8px; border-radius: 999px;
+         background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); }
+  .tag.quality-good { color: var(--green-500); border-color: var(--green-500); }
+  .tag.quality-warn { color: #b45309; border-color: #b45309; }
+  .tag.quality-bad { color: var(--error); border-color: var(--error); }
+  .interruption-note { font-size: 14px; color: var(--text); margin-bottom: 6px; }
+  .interruption-example { font-size: 14px; font-style: italic; color: var(--text-muted); }
+
+  .suggestions { padding-left: 20px; display: flex; flex-direction: column;
+                 gap: 6px; font-size: 14px; color: var(--text); }
 </style>
 </head>
 <body>
@@ -169,6 +205,18 @@
       </div>
     </section>
   </div>
+
+  <section class="pane" id="results" hidden>
+    <div class="pane-head"><span>Feedback</span></div>
+    <div class="pane-body">
+      <div id="results-loading"><span id="results-status">Reviewing what you said...</span></div>
+      <div id="results-error" hidden>
+        <p>Could not generate feedback for this call.</p>
+        <button id="results-retry">Try again</button>
+      </div>
+      <div id="results-body"></div>
+    </div>
+  </section>
 </main>
 <script>window.AGENT = {{AGENT_JSON}}</script>
 <script src="/app.js"></script>
