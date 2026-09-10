@@ -675,7 +675,11 @@ function renderJudgeResults(data) {
   if (data.interruptions.length === 0) {
     const empty = document.createElement('div')
     empty.className = 'empty'
-    empty.textContent = 'No interruptions this call.'
+    // Deliberately not "strong pitch throughout" — no interruptions means
+    // the delivery held up, not that the content was flawless (a real test
+    // call scored 42/100 here after dodging a follow-up, with zero cut-ins).
+    // The category scores above already say how the content itself did.
+    empty.textContent = 'No interruptions — you held the floor without a cut-in.'
     interruptions.append(empty)
   }
   for (const item of data.interruptions) {

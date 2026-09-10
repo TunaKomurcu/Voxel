@@ -104,8 +104,19 @@ but it stays regardless, since it's model-independent insurance.
 ## Phase 4 — Hardening (Days 14–17)
 - [ ] Run the objectivity checks in `TESTING.md` across a small transcript
       set; fix judge-prompt drift or inconsistency.
-- [ ] Handle edge cases: very short calls, no interruptions triggered, user
-      goes silent, connection drop mid-call.
+- [ ] Handle edge cases:
+  - [x] Very short calls — `tests/fixtures/near_empty_session.json` (~16s).
+  - [x] No interruptions triggered — `tests/fixtures/no_interruption_session.json`;
+        `run_judge_pass` doesn't crash on an empty `interruptions` list, and
+        the UI shows a dedicated (non-generic, score-agnostic) message
+        instead of an empty-looking panel.
+  - [ ] User goes silent mid-sentence (not yet tested).
+  - [x] Connection drop mid-call — `server.py`'s `_send()` and the new
+        `Server.handle_error()` log a clean line instead of a traceback
+        when a client (browser tab) disconnects mid-request, and the
+        server keeps serving other requests. Verified with a controlled
+        test (`judge.run_judge_pass` stubbed with a delay, request aborted
+        mid-flight), not a live tab close — see the session notes.
 - [ ] Re-test the full flow start to finish, cold (as a first-time user
       would experience it).
 - [ ] Known limitation (logged in judge_eval_log.md): judge occasionally

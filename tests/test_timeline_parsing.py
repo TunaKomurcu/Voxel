@@ -7,6 +7,7 @@ import judge
 import pytest
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_session_timeline.json"
+NO_INTERRUPTION_FIXTURE = Path(__file__).parent / "fixtures" / "no_interruption_session.json"
 
 
 def load_fixture() -> dict:
@@ -102,3 +103,23 @@ def test_compute_timing_signals_with_a_following_recovery_turn():
     assert interrupted["response_latency_ms"] == 500  # recovery started 4500, interruption ended 4000
     assert interrupted["pre_interrupt_wps"] == pytest.approx(3.5, abs=0.01)  # 7 words / 2s
     assert interrupted["recovery_wps"] == pytest.approx(4.0, abs=0.01)  # 6 words / 1.5s
+
+
+def test_no_interruption_fixture_flags_nothing_despite_a_truncated_agent_turn():
+    # Real session: the founder was never cut off, but the agent's OWN reply
+    # got cut off by the user on one turn (status "interrupted", agent_text
+    # a stray fragment "If") — the reverse direction from what we detect.
+    # That must not get flagged as our kind of interruption, and must not
+    # feed into any timing calculation (compute_timing_signals only touches
+    # turns with is_interruption=True, and none exist here).
+    timeline = json.loads(NO_INTERRUPTION_FIXTURE.read_text(encoding="utf-8"))
+    turns = judge.parse_timeline(timeline)
+    assert len(turns) == 5
+    assert all(t["is_interruption"] is False for t in turns)
+
+    truncated = turns[2]
+    assert truncated["status"] == "interrupted"
+    assert truncated["agent_text"] == "If"
+
+    annotated = judge.compute_timing_signals(turns)
+    assert all("response_latency_ms" not in t for t in annotated)

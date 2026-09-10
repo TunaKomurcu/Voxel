@@ -63,11 +63,18 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def _send(self, status: int, body: bytes, content_type: str) -> None:
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except OSError as err:
+            # BrokenPipeError / ConnectionResetError, usually: the client
+            # (browser tab) is gone before the response finished sending —
+            # most likely on /judge, whose run_judge_pass can take 15-45s.
+            # Not a bug, just a reply with nowhere to go anymore.
+            print(f"Client disconnected before response could be sent ({status}): {err}")
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urllib.parse.urlsplit(self.path)
@@ -111,6 +118,21 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+class Server(ThreadingHTTPServer):
+    def handle_error(self, request, client_address) -> None:
+        # A client (browser tab) disappearing mid-request, or between
+        # keep-alive requests, surfaces here as a raw socket error from the
+        # stdlib's read/write loop — outside our own try/except in _send().
+        # Most likely: someone closed the tab while /judge's run_judge_pass
+        # (15-45s) was still working. Log a line, not a traceback; the
+        # server itself (this is one thread of many) is unaffected either way.
+        _, exc, _ = sys.exc_info()
+        if isinstance(exc, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+            print(f"Client {client_address} disconnected: {exc}")
+            return
+        super().handle_error(request, client_address)
+
+
 def main() -> None:
     global AGENT, PAGE
     load_env()
@@ -127,7 +149,7 @@ def main() -> None:
     port = int(fixed) if fixed else 3000
     while True:
         try:
-            server = ThreadingHTTPServer(("", port), Handler)
+            server = Server(("", port), Handler)
             break
         except OSError:
             if fixed or port >= 3010:

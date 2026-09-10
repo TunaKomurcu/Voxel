@@ -69,6 +69,16 @@ Current fixture set (grows as new edge cases turn up in manual testing):
   marked as one. Checks that low content produces a low score (no
   composure/tone compensation) and that nothing gets marked as an
   interruption when nothing is.
+- `no_interruption_session.json` — a real call with strong opening numbers
+  (249 customers, 10% MoM, $112 LTV, 8:1 LTV:CAC, 45% margin) that never
+  triggers the agent's interrupt mechanic, though the founder later dodges
+  a direct CAC follow-up. Scored 42/100 — a reminder that "no interruptions"
+  isn't the same as "flawless pitch," and the judge should keep tracking
+  actual content quality either way. Also carries a turn where the AGENT's
+  own reply got cut short by the user (`status: "interrupted"`,
+  `agent_text: "If"`) — confirmed this doesn't get flagged as our kind of
+  interruption and doesn't feed into any timing signal (see the comment
+  above `compute_timing_signals` in `judge.py`).
 
 What to check when reading the log:
 - Does the score vary wildly between runs on the same fixture (bad — prompt

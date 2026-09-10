@@ -115,6 +115,14 @@ def interruption_turns(turns: list[dict]) -> list[dict]:
 
 
 # --- timing signals -----------------------------------------------------------
+#
+# A turn where the AGENT's own reply got cut off by the user (status
+# "interrupted", agent_text sometimes a stray fragment like "If") does not
+# corrupt anything below: _words_per_second only ever reads user_transcript
+# and the user's own timestamps, never agent_text; the one agent-side field
+# it does use, agent_reply_ended_at_ms, is set correctly by AssemblyAI to
+# the true stop time even when that reply was interrupted. Confirmed against
+# a real session (tests/fixtures/no_interruption_session.json).
 
 
 def _words_per_second(transcript: Optional[str], start_ms: Optional[int], end_ms: Optional[int]) -> Optional[float]:

@@ -1,0 +1,91 @@
+{
+  "session_id": "sess_914b4b890478453681247c759f1c80cb",
+  "started_at_unix_ms": 1789079862773,
+  "turns": [
+    {
+      "turn_id": "resp_f67b66fa681d43049eaeba0779eee367",
+      "item_id": "msg_610c87c8096a44bc81e0b9f3700981e6",
+      "status": "completed",
+      "trigger": "greeting",
+      "requested_instructions": null,
+      "user_transcript": null,
+      "user_speech_started_at_ms": null,
+      "user_speech_ended_at_ms": null,
+      "user_confidence": null,
+      "agent_text": "Alright, I've got five minutes. What are you building, and why should I care?",
+      "agent_reply_started_at_ms": 1789079863165,
+      "agent_reply_ended_at_ms": 1789079867496,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 363
+    },
+    {
+      "turn_id": "resp_75e2de3e37fd4437925ed07b55293e46",
+      "item_id": "msg_fe5c1b99ce134a5ea8c4e345983fca7b",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "So we are a subscription service for pet grooming. Last quarter we had 249 paying customers growing 10% month over month. month over month, or LTV is over $112, or kick is 20%. So all LTV to kick ratio is roughly 8:1. Gross margin per transaction is 45%.",
+      "user_speech_started_at_ms": 1789079868800,
+      "user_speech_ended_at_ms": 1789079898200,
+      "user_confidence": 1.0,
+      "agent_text": "Where is that ten percent growth coming from, organic word of mouth or paid acquisition?",
+      "agent_reply_started_at_ms": 1789079899537,
+      "agent_reply_ended_at_ms": 1789079904349,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 10733
+    },
+    {
+      "turn_id": "resp_348ae7639b43485a9d2e76c1e9c58b00",
+      "item_id": "msg_55a8b9d9fba24429a3630b60bc5926aa",
+      "status": "interrupted",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "Organic.",
+      "user_speech_started_at_ms": 1789079907500,
+      "user_speech_ended_at_ms": 1789079908900,
+      "user_confidence": 1.0,
+      "agent_text": "If",
+      "agent_reply_started_at_ms": 1789079909679,
+      "agent_reply_ended_at_ms": 1789079910220,
+      "interrupted_at_ms": 1789079910220,
+      "time_to_first_audio_ms": 777
+    },
+    {
+      "turn_id": "resp_0959ad29016b46d495080469f0883b8d",
+      "item_id": "msg_7f85bb7938ae484b8373f82738d36f86",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "Word of mouth.",
+      "user_speech_started_at_ms": 1789079910223,
+      "user_speech_ended_at_ms": 1789079910301,
+      "user_confidence": 1.0,
+      "agent_text": "What is your current customer acquisition cost?",
+      "agent_reply_started_at_ms": 1789079911558,
+      "agent_reply_ended_at_ms": 1789079914450,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 497
+    },
+    {
+      "turn_id": "resp_d38f6c16147d493bbf136e100cc781d3",
+      "item_id": "msg_cd528386b28a4b47b2879e520c3b6b92",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "So based on the same unit economics holding in our pilot markets.",
+      "user_speech_started_at_ms": 1789079918500,
+      "user_speech_ended_at_ms": 1789079923902,
+      "user_confidence": 1.0,
+      "agent_text": "You didn't answer the question. What is the actual dollar amount you are spending to acquire a single customer?",
+      "agent_reply_started_at_ms": 1789079924679,
+      "agent_reply_ended_at_ms": 1789079931172,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 775
+    }
+  ],
+  "ended": {
+    "reason": "user_initiated",
+    "public_reason": "client_end",
+    "duration_seconds": 72.29592529296875
+  }
+}
