@@ -8,6 +8,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -272,6 +273,54 @@ def llm_gateway_chat(model: str, messages: list, max_tokens: int = 1024, **kwarg
     text = _request(_llm_gateway_base() + "/chat/completions", "POST /chat/completions",
                      "POST", headers, data)
     return json.loads(text) if text else {}
+
+
+# --- Transcript API (classic pre-recorded, for sentiment analysis) ---------
+
+
+def _transcript_api() -> str:
+    return os.environ.get("TRANSCRIPT_API_BASE", "https://api.assemblyai.com/v2")
+
+
+def _transcript_headers() -> dict:
+    # Like the LLM Gateway, the classic transcription API is not the Voice
+    # Agent API: no "Bearer " prefix.
+    return {
+        "Authorization": os.environ.get("ASSEMBLYAI_API_KEY", ""),
+        "Content-Type": "application/json",
+    }
+
+
+def submit_transcript(audio_url: str, **params: Any) -> dict:
+    body = {"audio_url": audio_url, **params}
+    text = _request(_transcript_api() + "/transcript", "POST /transcript", "POST",
+                     _transcript_headers(), json.dumps(body).encode())
+    return json.loads(text)
+
+
+def get_transcript(transcript_id: str) -> dict:
+    text = _request(_transcript_api() + f"/transcript/{transcript_id}",
+                     f"GET /transcript/{transcript_id}", "GET", _transcript_headers(), None)
+    return json.loads(text)
+
+
+def wait_for_transcript(audio_url: str, poll_interval: float = 3.0,
+                         timeout: float = 120.0, **params: Any) -> dict:
+    """Submits audio_url for transcription and polls until it's done. Raises
+    ApiError-like RuntimeError on "error" status or if timeout is reached."""
+    submitted = submit_transcript(audio_url, **params)
+    transcript_id = submitted["id"]
+    deadline = time.monotonic() + timeout
+    while True:
+        result = get_transcript(transcript_id)
+        status = result.get("status")
+        if status == "completed":
+            return result
+        if status == "error":
+            raise RuntimeError(f"Transcript {transcript_id} failed: {result.get('error')}")
+        if time.monotonic() > deadline:
+            raise TimeoutError(f"Transcript {transcript_id} did not complete within {timeout}s")
+        time.sleep(poll_interval)
 
 
 # --- Twilio -----------------------------------------------------------------

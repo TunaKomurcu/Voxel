@@ -3,10 +3,12 @@
 Standard library only, matching lib.py's "no pip install" rule.
 
 Session retrieval: GET /sessions/{id} does not inline the timeline — it
-points to it via a presigned S3 URL in artifacts[type=="timeline"], fetched
-separately in fetch_timeline().
+points to it via a presigned S3 URL in artifacts[type=="timeline"] (and the
+recording similarly under artifacts[type=="audio"]), each fetched
+separately.
 """
 
+import copy
 import json
 import re
 import urllib.request
@@ -23,20 +25,42 @@ JUDGE_MODEL = "qwen3.5-4b-32k-fast"
 
 JUDGE_SYSTEM_PROMPT = """You are an objective evaluation judge for a pitch-practice call between a founder and a skeptical investor persona. You did not take part in the call; you are reading a transcript after the fact.
 
-For each moment marked (INTERRUPTION) below, judge how well the founder recovered in their next turn: did they answer the investor's sharp follow-up specifically, or did they stay vague, dodge, or restate the same hand-wavy claim?
+Lines marked (INTERRUPTION) are moments the investor cut the founder off. Some carry a bracketed timing note (pre-interrupt speech rate, response latency, recovery speech rate, in words/sec and milliseconds) — treat it as one more signal about composure, not something to repeat verbatim. The transcript may be followed by a block of sentence-level sentiment analysis; match those sentences to the transcript by their text, not by position, and use them as context for tone, not as a separate topic to discuss.
+
+For each interruption, judge how well the founder recovered in their next turn: did they answer the investor's sharp follow-up specifically, or did they stay vague, dodge, or restate the same hand-wavy claim?
+
+`better_response_example` must reference something specific and real from THIS transcript — an exact number, claim, or phrase the founder actually said or should have said instead. Generic coaching sentences ("be more specific", "add more data", "provide concrete numbers") are not acceptable.
+
+Check the transcript for a real number for the metric you're about to cite. If the founder said one, reuse it. If not, you MUST write a bracketed placeholder like [X] instead of inventing a figure — a made-up number reads as real and misleads the person reviewing this.
+
+WRONG (the transcript never gave a number, so "$45" and "$12" are invented): "We hit an LTV of $45 and a CAC of $12 last quarter."
+RIGHT (same situation, placeholders instead): "We hit an LTV of $[X] and a CAC of $[Y] last quarter."
+RIGHT (the transcript actually said "we charge ten percent per booking"): "Our take rate is 10% per booking, which nets us $[X] per transaction after processing fees."
+
+Before you write better_response_example, silently check: does every number in this sentence appear in the transcript above? If any number does not, replace it with [X], [Y], [Z] before answering.
 
 Return ONLY valid JSON, no prose before or after, matching exactly this shape:
 {
   "overall_score": <integer 0-100>,
+  "categories": {
+    "content_substance": {"score": <0-100>, "note": "<one sentence>"},
+    "composure_under_pressure": {"score": <0-100>, "note": "<one sentence>"},
+    "audience_responsiveness": {"score": <0-100>, "note": "<one sentence>"}
+  },
   "interruptions": [
-    {"moment": "<short description of what triggered the interruption>",
-     "recovery_quality": "strong" | "weak" | "poor",
-     "note": "<one concrete sentence about what they said or should have said>"}
+    {
+      "moment": "<short description of what triggered the interruption>",
+      "trigger": "vague_claim" | "unsupported_number" | "hesitation" | "ignored_question",
+      "recovery_quality": "strong" | "weak" | "poor",
+      "recovery_pattern": "answered_directly" | "deflected" | "repeated_claim" | "asked_clarifying_question",
+      "note": "<one concrete sentence about what they said>",
+      "better_response_example": "<one sentence, specific to this transcript>"
+    }
   ],
   "suggestions": ["<actionable suggestion>", "..."]
 }
 
-If there were no interruptions in the transcript, base overall_score on general pitch clarity, return an empty "interruptions" list, and still give 1-3 general suggestions."""
+If there were no interruptions in the transcript, base the scores on general pitch clarity, return an empty "interruptions" list, and still give 1-3 specific suggestions grounded in what was actually said."""
 
 
 # --- session + timeline ------------------------------------------------------
@@ -46,12 +70,17 @@ def fetch_session(session_id: str) -> dict:
     return lib.aai(f"/sessions/{session_id}")
 
 
+def _artifact_url(session: dict, artifact_type: str) -> Optional[str]:
+    artifact = next((a for a in session.get("artifacts", []) if a.get("type") == artifact_type), None)
+    return artifact["url"] if artifact else None
+
+
 def fetch_timeline(session_id: str) -> dict:
     session = fetch_session(session_id)
-    artifact = next((a for a in session.get("artifacts", []) if a.get("type") == "timeline"), None)
-    if artifact is None:
+    url = _artifact_url(session, "timeline")
+    if url is None:
         raise ValueError(f"Session {session_id} has no timeline artifact yet (status={session.get('status')})")
-    with urllib.request.urlopen(artifact["url"]) as res:
+    with urllib.request.urlopen(url) as res:
         return json.loads(res.read().decode())
 
 
@@ -78,20 +107,107 @@ def interruption_turns(turns: list[dict]) -> list[dict]:
     return [t for t in turns if t["is_interruption"]]
 
 
+# --- timing signals -----------------------------------------------------------
+
+
+def _words_per_second(transcript: Optional[str], start_ms: Optional[int], end_ms: Optional[int]) -> Optional[float]:
+    if not transcript or start_ms is None or end_ms is None or end_ms <= start_ms:
+        return None
+    word_count = len(transcript.split())
+    duration_s = (end_ms - start_ms) / 1000
+    return round(word_count / duration_s, 2)
+
+
+def compute_timing_signals(turns: list[dict]) -> list[dict]:
+    """Annotates each interruption turn with response_latency_ms and
+    pre/post words_per_second, computed from the timeline's existing
+    utterance-level timestamps — there are no word-level timestamps to work
+    from. Non-interruption turns pass through unchanged. If an interruption
+    is the last turn, there's no recovery turn to measure, so
+    response_latency_ms and recovery_wps come back None."""
+    annotated = []
+    for i, turn in enumerate(turns):
+        if not turn.get("is_interruption"):
+            annotated.append(turn)
+            continue
+        pre_interrupt_wps = _words_per_second(
+            turn.get("user_transcript"),
+            turn.get("user_speech_started_at_ms"),
+            turn.get("user_speech_ended_at_ms"),
+        )
+        response_latency_ms = None
+        recovery_wps = None
+        next_turn = turns[i + 1] if i + 1 < len(turns) else None
+        if next_turn is not None and next_turn.get("trigger") == "user_speech":
+            interrupt_end = turn.get("agent_reply_ended_at_ms")
+            recovery_start = next_turn.get("user_speech_started_at_ms")
+            if interrupt_end is not None and recovery_start is not None:
+                response_latency_ms = recovery_start - interrupt_end
+            recovery_wps = _words_per_second(
+                next_turn.get("user_transcript"),
+                next_turn.get("user_speech_started_at_ms"),
+                next_turn.get("user_speech_ended_at_ms"),
+            )
+        annotated.append({
+            **turn,
+            "response_latency_ms": response_latency_ms,
+            "pre_interrupt_wps": pre_interrupt_wps,
+            "recovery_wps": recovery_wps,
+        })
+    return annotated
+
+
+# --- sentiment ------------------------------------------------------------------
+
+
+def fetch_sentiment(audio_url: str) -> list[dict]:
+    """Runs AssemblyAI's classic pre-recorded transcription API (not the
+    Voice Agent API) with sentiment_analysis on, against the session
+    recording. Sentence-level results only; timestamps are relative to the
+    recording, not the timeline's absolute unix-ms, so they aren't
+    reconciled here — see build_judge_prompt."""
+    result = lib.wait_for_transcript(audio_url, sentiment_analysis=True)
+    return result.get("sentiment_analysis_results") or []
+
+
 # --- judge pass ----------------------------------------------------------------
 
 
-def build_judge_prompt(turns: list[dict]) -> list[dict]:
+def _format_sentiment_context(sentiment_results: list[dict]) -> str:
+    lines = [
+        f'- "{r["text"]}" -> {r["sentiment"]} (confidence {r["confidence"]:.2f})'
+        for r in sentiment_results
+    ]
+    return (
+        "Sentence-level sentiment analysis of the call audio "
+        "(match to transcript lines by content, not position):\n" + "\n".join(lines)
+    )
+
+
+def _timing_note(turn: dict) -> str:
+    bits = []
+    if turn.get("pre_interrupt_wps") is not None:
+        bits.append(f"pre-interrupt {turn['pre_interrupt_wps']} words/sec")
+    if turn.get("response_latency_ms") is not None:
+        bits.append(f"response latency {turn['response_latency_ms']}ms")
+    if turn.get("recovery_wps") is not None:
+        bits.append(f"recovery {turn['recovery_wps']} words/sec")
+    return f" [{'; '.join(bits)}]" if bits else ""
+
+
+def build_judge_prompt(turns: list[dict], sentiment_results: Optional[list[dict]] = None) -> list[dict]:
     lines = []
     for turn in turns:
         if turn.get("user_transcript"):
             lines.append(f"[Founder]: {turn['user_transcript']}")
-        marker = " (INTERRUPTION)" if turn.get("is_interruption") else ""
+        marker = f" (INTERRUPTION){_timing_note(turn)}" if turn.get("is_interruption") else ""
         lines.append(f"[Investor{marker}]: {turn['agent_text']}")
-    transcript_text = "\n".join(lines)
+    content = f"Transcript:\n\n{chr(10).join(lines)}"
+    if sentiment_results:
+        content += "\n\n" + _format_sentiment_context(sentiment_results)
     return [
         {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
-        {"role": "user", "content": f"Transcript:\n\n{transcript_text}"},
+        {"role": "user", "content": content},
     ]
 
 
@@ -105,21 +221,163 @@ def _strip_code_fence(content: str) -> str:
     return match.group(1) if match else content
 
 
-def call_judge(turns: list[dict], model: str = JUDGE_MODEL) -> dict:
-    messages = build_judge_prompt(turns)
-    response = lib.llm_gateway_chat(model=model, messages=messages, max_tokens=1024)
+_MAX_JSON_ATTEMPTS = 3
+
+_INVALID_JSON_REMINDER = {
+    "role": "user",
+    "content": ("Your previous reply was not valid JSON matching the required schema. "
+                "Return ONLY valid JSON, no markdown code fences, no prose before or after."),
+}
+
+_NUMBER_RETRY_REMINDER = {
+    "role": "user",
+    "content": ("One or more of your better_response_example fields used a specific number "
+                "that never appeared in the transcript. Return the full JSON again, unchanged "
+                "except: replace any invented numbers in better_response_example with "
+                "bracketed placeholders like [X], [Y]."),
+}
+
+# $ / % optional around a digit run — matches "$45", "12%", "2,400", "3.5".
+_NUMBER_PATTERN = re.compile(r"(\$)?(\d[\d,]*(?:\.\d+)?)(%)?")
+_PLACEHOLDER_LETTERS = "XYZWVUTSRQPONMLKJIHGFEDCBA"
+
+
+def _normalize_number(raw: str) -> str:
+    return raw.replace(",", "")
+
+
+def _extract_numbers(text: str) -> set[str]:
+    return {_normalize_number(m.group(2)) for m in _NUMBER_PATTERN.finditer(text)}
+
+
+def _dialogue_text(turns: list[dict]) -> str:
+    """Only what was actually said — not our injected timing/sentiment
+    context, which would otherwise make every number look "real"."""
+    parts = []
+    for turn in turns:
+        if turn.get("user_transcript"):
+            parts.append(turn["user_transcript"])
+        if turn.get("agent_text"):
+            parts.append(turn["agent_text"])
+    return " ".join(parts)
+
+
+def _invented_numbers_in_examples(data: dict, allowed_numbers: set[str]) -> set[str]:
+    found: set[str] = set()
+    for item in data.get("interruptions", []):
+        found |= _extract_numbers(item.get("better_response_example", "")) - allowed_numbers
+    return found
+
+
+def sanitize_response_example(text: str, allowed_numbers: set[str]) -> str:
+    """Regex fallback for when the judge won't stop inventing numbers even
+    after being asked to: replaces any number not in allowed_numbers with a
+    bracketed placeholder ([X], [Y], ...), keeping a $ prefix or % suffix."""
+    counter = 0
+
+    def replace(match: re.Match) -> str:
+        nonlocal counter
+        prefix, number, suffix = match.group(1) or "", match.group(2), match.group(3) or ""
+        if _normalize_number(number) in allowed_numbers:
+            return match.group(0)
+        letter = _PLACEHOLDER_LETTERS[counter % len(_PLACEHOLDER_LETTERS)]
+        counter += 1
+        return f"{prefix}[{letter}]{suffix}"
+
+    return _NUMBER_PATTERN.sub(replace, text)
+
+
+def _sanitize_all_examples(data: dict, allowed_numbers: set[str]) -> dict:
+    sanitized = copy.deepcopy(data)
+    for item in sanitized.get("interruptions", []):
+        item["better_response_example"] = sanitize_response_example(
+            item["better_response_example"], allowed_numbers
+        )
+    return sanitized
+
+
+def _request_judge_json(messages: list[dict], model: str) -> dict:
+    """One gateway round-trip: send messages, parse, validate. Raises
+    ValueError (json.JSONDecodeError is a ValueError subclass) on either
+    failure, for the retry loop in call_judge to catch."""
+    response = lib.llm_gateway_chat(model=model, messages=messages, max_tokens=1500)
     content = response["choices"][0]["message"]["content"]
-    try:
-        data = json.loads(_strip_code_fence(content))
-    except json.JSONDecodeError as err:
-        raise ValueError(f"Judge did not return valid JSON: {content!r}") from err
+    data = json.loads(_strip_code_fence(content))
     validate_judge_output(data)
     return data
 
 
+def call_judge(turns: list[dict], model: str = JUDGE_MODEL,
+                sentiment_results: Optional[list[dict]] = None) -> dict:
+    annotated = compute_timing_signals(turns)
+    messages = build_judge_prompt(annotated, sentiment_results)
+    allowed_numbers = _extract_numbers(_dialogue_text(turns))
+
+    data = None
+    last_error: Optional[Exception] = None
+    attempt_messages = messages
+    for _ in range(_MAX_JSON_ATTEMPTS):
+        try:
+            data = _request_judge_json(attempt_messages, model)
+            break
+        except ValueError as err:
+            last_error = err
+            attempt_messages = messages + [_INVALID_JSON_REMINDER]
+    if data is None:
+        raise ValueError(
+            f"Judge did not return valid output after {_MAX_JSON_ATTEMPTS} attempts: {last_error}"
+        )
+
+    if _invented_numbers_in_examples(data, allowed_numbers):
+        try:
+            retried = _request_judge_json(messages + [_NUMBER_RETRY_REMINDER], model)
+        except ValueError:
+            retried = None
+        if retried is not None and not _invented_numbers_in_examples(retried, allowed_numbers):
+            data = retried
+        else:
+            data = _sanitize_all_examples(retried or data, allowed_numbers)
+
+    return data
+
+
+def run_judge_pass(session_id: str, model: str = JUDGE_MODEL, include_sentiment: bool = True) -> dict:
+    """The single entry point the UI calls: a session id in, validated judge
+    JSON out. Sentiment analysis is best-effort — a failure there (gateway
+    timeout, no account access) still lets the judge pass complete."""
+    session = fetch_session(session_id)
+    timeline_url = _artifact_url(session, "timeline")
+    if timeline_url is None:
+        raise ValueError(f"Session {session_id} has no timeline artifact yet (status={session.get('status')})")
+    with urllib.request.urlopen(timeline_url) as res:
+        timeline = json.loads(res.read().decode())
+    turns = parse_timeline(timeline)
+
+    sentiment_results = None
+    if include_sentiment:
+        audio_url = _artifact_url(session, "audio")
+        if audio_url is not None:
+            try:
+                sentiment_results = fetch_sentiment(audio_url)
+            except Exception as err:
+                print(f"Warning: sentiment analysis failed, continuing without it: {err}")
+
+    return call_judge(turns, model=model, sentiment_results=sentiment_results)
+
+
 # --- schema validation ---------------------------------------------------------
 
+_TRIGGERS = {"vague_claim", "unsupported_number", "hesitation", "ignored_question"}
 _RECOVERY_QUALITIES = {"strong", "weak", "poor"}
+_RECOVERY_PATTERNS = {"answered_directly", "deflected", "repeated_claim", "asked_clarifying_question"}
+_CATEGORY_KEYS = ("content_substance", "composure_under_pressure", "audience_responsiveness")
+
+
+def _validate_score(value: Any, label: str) -> None:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise ValueError(f"'{label}' must be a number, got {type(value).__name__}")
+    if not (0 <= value <= 100):
+        raise ValueError(f"'{label}' must be 0-100, got {value}")
 
 
 def validate_judge_output(data: Any) -> None:
@@ -129,11 +387,24 @@ def validate_judge_output(data: Any) -> None:
 
     if "overall_score" not in data:
         raise ValueError("Judge output missing 'overall_score'")
-    score = data["overall_score"]
-    if not isinstance(score, (int, float)) or isinstance(score, bool):
-        raise ValueError(f"'overall_score' must be a number, got {type(score).__name__}")
-    if not (0 <= score <= 100):
-        raise ValueError(f"'overall_score' must be 0-100, got {score}")
+    _validate_score(data["overall_score"], "overall_score")
+
+    if "categories" not in data:
+        raise ValueError("Judge output missing 'categories'")
+    categories = data["categories"]
+    if not isinstance(categories, dict):
+        raise ValueError(f"'categories' must be an object, got {type(categories).__name__}")
+    for key in _CATEGORY_KEYS:
+        if key not in categories:
+            raise ValueError(f"'categories' missing '{key}'")
+        entry = categories[key]
+        if not isinstance(entry, dict):
+            raise ValueError(f"categories.{key} must be an object, got {type(entry).__name__}")
+        if "score" not in entry:
+            raise ValueError(f"categories.{key} missing 'score'")
+        _validate_score(entry["score"], f"categories.{key}.score")
+        if not isinstance(entry.get("note"), str) or not entry["note"].strip():
+            raise ValueError(f"categories.{key}.note must be a non-empty string")
 
     if "interruptions" not in data:
         raise ValueError("Judge output missing 'interruptions'")
@@ -143,18 +414,26 @@ def validate_judge_output(data: Any) -> None:
     for i, item in enumerate(interruptions):
         if not isinstance(item, dict):
             raise ValueError(f"interruptions[{i}] must be an object, got {type(item).__name__}")
-        for field in ("moment", "recovery_quality", "note"):
+        for field in ("moment", "trigger", "recovery_quality", "recovery_pattern", "note", "better_response_example"):
             if field not in item:
                 raise ValueError(f"interruptions[{i}] missing '{field}'")
+        if item["trigger"] not in _TRIGGERS:
+            raise ValueError(
+                f"interruptions[{i}].trigger must be one of {sorted(_TRIGGERS)}, got {item['trigger']!r}"
+            )
         if item["recovery_quality"] not in _RECOVERY_QUALITIES:
             raise ValueError(
                 f"interruptions[{i}].recovery_quality must be one of "
                 f"{sorted(_RECOVERY_QUALITIES)}, got {item['recovery_quality']!r}"
             )
-        if not isinstance(item["moment"], str) or not item["moment"].strip():
-            raise ValueError(f"interruptions[{i}].moment must be a non-empty string")
-        if not isinstance(item["note"], str) or not item["note"].strip():
-            raise ValueError(f"interruptions[{i}].note must be a non-empty string")
+        if item["recovery_pattern"] not in _RECOVERY_PATTERNS:
+            raise ValueError(
+                f"interruptions[{i}].recovery_pattern must be one of "
+                f"{sorted(_RECOVERY_PATTERNS)}, got {item['recovery_pattern']!r}"
+            )
+        for field in ("moment", "note", "better_response_example"):
+            if not isinstance(item[field], str) or not item[field].strip():
+                raise ValueError(f"interruptions[{i}].{field} must be a non-empty string")
 
     if "suggestions" not in data:
         raise ValueError("Judge output missing 'suggestions'")

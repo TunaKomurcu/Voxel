@@ -13,13 +13,23 @@ These don't touch the network or the AssemblyAI API. Fast, run on every change.
   Given a fixed, saved example `timeline` JSON (a fixture file, not a live
   call), assert that our parser correctly extracts turns, flags which turns
   were interruptions, and pairs each interruption with the user's following
-  response.
+  response. Since Phase 2.5, also covers `compute_timing_signals()`:
+  `response_latency_ms` and pre/post `words_per_second` for a normal case,
+  and the edge case where an interruption is the last turn (no recovery
+  turn to measure against, so `response_latency_ms` is `None`).
 
 - `test_judge_output_schema.py`
   Given a fixed transcript fixture and a **mocked** LLM Gateway response
   (not a live call), assert that our code validates/rejects malformed judge
   output correctly (missing score, score out of range, missing suggestions
   field, etc). This tests our validation logic, not the LLM's judgment.
+  Since Phase 2.5, this also covers the enriched schema: the three
+  `categories` (missing category, out-of-range category score), and each
+  interruption's `trigger` / `recovery_pattern` fields against their fixed
+  enums (free text outside the enum is rejected) and `better_response_example`
+  being present. Timing signals (`response_latency_ms`, `words_per_second`)
+  and sentiment results are judge *input*, not output, so they're covered
+  under timeline parsing below, not here.
 
 - `test_agent_config.py`
   Load `agents/voxel-investor.jsonc` and assert required fields are present
