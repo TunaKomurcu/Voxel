@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="light dark">
 <title>{{AGENT_NAME}}</title>
 <style>
   /* Tokens taken from assemblyai.com. The three typefaces are licensed and
@@ -23,12 +23,34 @@
     --cobolt-300: #887bdd;
     --cobolt-100: #d7d3f4;
     --green-500: #01762f;
+    --amber-600: #b45309;
     --error: #f04438;
+    --error-hover: #f4695f;
     --radius-sm: 4px;
     --radius-lg: 12px;
     --font-display: "Oceanic Text", Georgia, serif;
     --font-body: "UN 11ST", system-ui, -apple-system, sans-serif;
     --font-mono: "Modern Gothic Mono", "JetBrains Mono", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page-bg: #17161a;
+      --surface: #201f24;
+      --surface-alt: #2a282f;
+      --border: #3a383f;
+      --border-strong: #4c4a52;
+      --text: #cfccc5;
+      --text-dark: #f3f1ec;
+      --text-muted: #9a978f;
+      --text-faint: #706d68;
+      --cobolt-500: #8a7cf0;
+      --cobolt-300: #a89cf7;
+      --cobolt-100: #332f5c;
+      --green-500: #3ddc84;
+      --amber-600: #f5a623;
+      --error: #ff7a6e;
+      --error-hover: #ffa198;
+    }
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
@@ -116,7 +138,7 @@
   button:hover:not(:disabled) { background: var(--cobolt-300); }
   button:disabled { opacity: .55; cursor: default; }
   button.live { background: var(--error); }
-  button.live:hover { background: #f4695f; }
+  button.live:hover { background: var(--error-hover); }
   select { flex: 0 1 220px; min-width: 0; height: 40px; padding: 0 8px;
            font-family: var(--font-body); font-size: 13px; color: var(--text-muted);
            background: var(--surface); border: 1px solid var(--border);
@@ -162,7 +184,7 @@
          letter-spacing: .6px; padding: 2px 8px; border-radius: 999px;
          background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); }
   .tag.quality-good { color: var(--green-500); border-color: var(--green-500); }
-  .tag.quality-warn { color: #b45309; border-color: #b45309; }
+  .tag.quality-warn { color: var(--amber-600); border-color: var(--amber-600); }
   .tag.quality-bad { color: var(--error); border-color: var(--error); }
   .interruption-note { font-size: 14px; color: var(--text); margin-bottom: 6px; }
   .interruption-example { font-size: 14px; font-style: italic; color: var(--text-muted); }
