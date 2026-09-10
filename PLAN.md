@@ -3,6 +3,11 @@
 Timeframe: Sep 10 – Sep 30, 2026 (20 days, solo).
 Submission target: lablab.ai, AssemblyAI Voice Agent Hackathon.
 
+> **After touching `JUDGE_SYSTEM_PROMPT` in `judge.py`, run
+> `python tests/judge_eval.py` before moving on.** It's the only thing that
+> catches a scoring/labeling regression across saved fixtures instead of
+> just the one live call you happened to try — see `TESTING.md` Layer 2.
+
 ## Phase 0 — Setup (Day 1)
 - [x] Clone `voice-agent-starter-python`, add `.env` with `ASSEMBLYAI_API_KEY`.
 - [x] `python publish.py` with the default `minimal` agent, confirm browser

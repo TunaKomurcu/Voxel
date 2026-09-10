@@ -1,0 +1,43 @@
+{
+  "session_id": "sess_4122af45d0ec46d195c72e9e7e55f7da",
+  "started_at_unix_ms": 1789077648753,
+  "turns": [
+    {
+      "turn_id": "resp_59f152d78872499ba3f5b29d2425fcc4",
+      "item_id": "msg_d0ffe301da274e30b183d631d4e71dce",
+      "status": "completed",
+      "trigger": "greeting",
+      "requested_instructions": null,
+      "user_transcript": null,
+      "user_speech_started_at_ms": null,
+      "user_speech_ended_at_ms": null,
+      "user_confidence": null,
+      "agent_text": "Alright, I've got five minutes. What are you building, and why should I care?",
+      "agent_reply_started_at_ms": 1789077649155,
+      "agent_reply_ended_at_ms": 1789077652768,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 375
+    },
+    {
+      "turn_id": "resp_b9074e594b7c449789a6b54f96dea2a3",
+      "item_id": "msg_c7255c43fb004d4fa354fd00cb5f43e6",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "Alright.",
+      "user_speech_started_at_ms": 1789077655069,
+      "user_speech_ended_at_ms": 1789077655368,
+      "user_confidence": 1.0,
+      "agent_text": "I am not paying you to sit there. What is the product?",
+      "agent_reply_started_at_ms": 1789077657026,
+      "agent_reply_ended_at_ms": 1789077660878,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 1656
+    }
+  ],
+  "ended": {
+    "reason": "user_initiated",
+    "public_reason": "client_end",
+    "duration_seconds": 15.95418212890625
+  }
+}

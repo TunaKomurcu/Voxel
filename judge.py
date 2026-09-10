@@ -28,7 +28,13 @@ JUDGE_SYSTEM_PROMPT = """You are an objective evaluation judge for a pitch-pract
 
 Lines marked (INTERRUPTION) are moments the investor cut the founder off. Some carry a bracketed timing note (pre-interrupt speech rate, response latency, recovery speech rate, in words/sec and milliseconds) — treat it as one more signal about composure, not something to repeat verbatim. The transcript may be followed by a block of sentence-level sentiment analysis; match those sentences to the transcript by their text, not by position, and use them as context for tone, not as a separate topic to discuss.
 
+Only put an entry in "interruptions" for a line that is actually marked (INTERRUPTION) below. Do not add an entry for any other turn, no matter how weak it was — if nothing in the transcript is marked (INTERRUPTION), "interruptions" must be an empty list, even if the founder said little or nothing.
+
 For each interruption, judge how well the founder recovered in their next turn: did they answer the investor's sharp follow-up specifically, or did they stay vague, dodge, or restate the same hand-wavy claim?
+
+Every "trigger" and "recovery_pattern" must be grounded in what was literally said, not assumed. "vague_claim" requires the founder to have actually made a claim — a statement about their product, market, or traction that lacked support. A bare acknowledgment ("okay", "alright", "sure") contains no claim, so it is never vague_claim; if the founder said nothing substantive before being cut off, use whichever trigger actually fits (often hesitation), not vague_claim by default. "recovery_pattern: answered_directly" requires the founder's next turn to state new, concrete information — a number, a name, a specific mechanism. Repeating what they already said, turning the question back on the investor, or a bare acknowledgment is "deflected", "repeated_claim", or "asked_clarifying_question" — never "answered_directly".
+
+Content substance and the overall score must track how much real information the founder actually gave, not how politely they behaved. A one-word acknowledgment, a topic change, or turning the question back on the investor earns a low content_substance score and a low overall_score — good composure or a pleasant tone never offsets a lack of content. If the founder gave little or no substantive information for the entire call, overall_score must be low — well under 40 — regardless of how the rest of the call went.
 
 `better_response_example` must reference something specific and real from THIS transcript — an exact number, claim, or phrase the founder actually said or should have said instead. Generic coaching sentences ("be more specific", "add more data", "provide concrete numbers") are not acceptable.
 
@@ -308,11 +314,30 @@ def _request_judge_json(messages: list[dict], model: str) -> dict:
     return data
 
 
+_INTERRUPTION_COUNT_RETRY_REMINDER = {
+    "role": "user",
+    "content": ("Your interruptions list has more entries than there are (INTERRUPTION)-marked "
+                "lines in the transcript. Return the full JSON again, including only entries for "
+                "lines actually marked (INTERRUPTION)."),
+}
+
+
+def _sanitize_interruption_count(data: dict, marked_count: int) -> dict:
+    """Regex-retry didn't fix it, so fall back to keeping only the first
+    marked_count entries — the model tends to discuss interruptions in the
+    order they occurred, so the earliest entries are the most likely to be
+    the real ones. Everything past that is dropped."""
+    sanitized = copy.deepcopy(data)
+    sanitized["interruptions"] = sanitized.get("interruptions", [])[:marked_count]
+    return sanitized
+
+
 def call_judge(turns: list[dict], model: str = JUDGE_MODEL,
                 sentiment_results: Optional[list[dict]] = None) -> dict:
     annotated = compute_timing_signals(turns)
     messages = build_judge_prompt(annotated, sentiment_results)
     allowed_numbers = _extract_numbers(_dialogue_text(turns))
+    marked_count = len(interruption_turns(annotated))
 
     data = None
     last_error: Optional[Exception] = None
@@ -338,6 +363,16 @@ def call_judge(turns: list[dict], model: str = JUDGE_MODEL,
             data = retried
         else:
             data = _sanitize_all_examples(retried or data, allowed_numbers)
+
+    if len(data.get("interruptions", [])) > marked_count:
+        try:
+            retried = _request_judge_json(messages + [_INTERRUPTION_COUNT_RETRY_REMINDER], model)
+        except ValueError:
+            retried = None
+        if retried is not None and len(retried.get("interruptions", [])) <= marked_count:
+            data = retried
+        else:
+            data = _sanitize_interruption_count(retried or data, marked_count)
 
     return data
 

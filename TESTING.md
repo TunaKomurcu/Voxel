@@ -42,18 +42,41 @@ Run with: `pytest tests/`
 ## Layer 2 — Judge consistency check (semi-automated)
 
 The judge LLM call is non-deterministic, so "does it work" isn't a pass/fail
-unit test — it's a consistency and sanity check:
+unit test — it's a consistency and sanity check, run by hand with:
 
-1. Keep a small fixed set of **saved transcript fixtures** (5–8 example
-   sessions, written by hand or from real test calls): a mix of
-   good-recovery, bad-recovery, no-interruption, and edge-case transcripts.
-2. Run each fixture through the judge prompt **3 times**.
-3. Check: does the score vary wildly between runs (bad — prompt is too
-   loosely specified)? Does a transcript with an obviously bad recovery ever
-   score higher than an obviously good one (bad — judge isn't tracking the
-   right signal)?
-4. Log results in `tests/judge_eval_log.md` with date + prompt version, so
-   you can see whether a prompt change made things better or worse.
+    python tests/judge_eval.py
+
+This runs every fixture in `tests/fixtures/` through `judge.call_judge()`
+**3 times** and appends a dated block to `tests/judge_eval_log.md` with each
+run's score and interruption count. It is a real script, not just a
+description — it costs real LLM Gateway calls, which is why it's a
+standalone script rather than a pytest test.
+
+**Run this after any change to `JUDGE_SYSTEM_PROMPT`.** It's easy to forget
+the script exists and go back to testing blind by eyeballing one live call —
+don't; that's exactly how the near-empty-session scoring bug (see the log,
+2026-09-11) slipped through Phase 2.5.
+
+Current fixture set (grows as new edge cases turn up in manual testing):
+
+- `sample_session_timeline.json` — a real session with one genuine,
+  timing-confirmed interruption and no recovery turn (the call ends right
+  after). Checks that a real interruption gets included, and with a
+  grounded trigger/recovery_pattern.
+- `near_empty_session.json` — a real, near-content-free call ("Alright."
+  and nothing else). Added after a cold-test run scored this 85 with a
+  hallucinated `vague_claim` interruption on a turn that was never actually
+  marked as one. Checks that low content produces a low score (no
+  composure/tone compensation) and that nothing gets marked as an
+  interruption when nothing is.
+
+What to check when reading the log:
+- Does the score vary wildly between runs on the same fixture (bad — prompt
+  is too loosely specified)?
+- Does a transcript with an obviously bad recovery ever score higher than
+  an obviously good one (bad — judge isn't tracking the right signal)? This
+  one still needs a human to read the log; the script doesn't compare
+  across fixtures for you.
 
 This is intentionally lightweight — the goal is "catch obvious judge
 brokenness," not build a full eval harness. AssemblyAI's Bluejay simulation

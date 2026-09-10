@@ -33,15 +33,24 @@ VALID = {
 
 GREETING_TURN = {"trigger": "greeting", "user_transcript": None, "agent_text": "Hi", "is_interruption": False}
 
-# VALID's better_response_example cites "2,400 vets" and "$3k" — these turns
-# actually contain those numbers, so the invented-number check in call_judge
+# VALID has exactly one interruption entry, so turns fed to call_judge in
+# tests that expect VALID back unmodified need exactly one marked turn —
+# otherwise the interruption-count safety net (call_judge vs. marked_count)
+# kicks in and adds an unwanted extra retry.
+ONE_INTERRUPTION_TURN = {
+    "trigger": "user_speech",
+    "user_transcript": "we're basically the Uber of pet care, huge market",
+    "agent_text": "Cut the analogies, what's the model?",
+    "is_interruption": True,
+}
+
+# VALID's better_response_example cites "2,400 vets" and "$3k" — this turn
+# actually contains those numbers, so the invented-number check in call_judge
 # doesn't trigger an extra retry and these tests can assert a single call.
 TURNS_WITH_MATCHING_NUMBERS = [
     {
-        "trigger": "user_speech",
+        **ONE_INTERRUPTION_TURN,
         "user_transcript": "We have 2,400 vets in our target metro, each worth $3k a year in tool spend.",
-        "agent_text": "Good, keep going.",
-        "is_interruption": False,
     }
 ]
 
@@ -146,11 +155,11 @@ def _with_example(text: str) -> dict:
 
 
 def test_invented_number_triggers_one_retry_and_clean_retry_is_used():
-    invented = _with_example("We hit an LTV of $45 and a CAC of $12.")  # not in GREETING_TURN's dialogue
+    invented = _with_example("We hit an LTV of $45 and a CAC of $12.")  # not in the turn's dialogue
     clean = _with_example("We hit an LTV of $[X] and a CAC of $[Y].")
     responses = [_response(json.dumps(invented)), _response(json.dumps(clean))]
     with patch("lib.llm_gateway_chat", side_effect=responses) as mocked:
-        result = judge.call_judge([GREETING_TURN])
+        result = judge.call_judge([ONE_INTERRUPTION_TURN])
     assert result["interruptions"][0]["better_response_example"] == "We hit an LTV of $[X] and a CAC of $[Y]."
     assert mocked.call_count == 2
 
@@ -160,7 +169,7 @@ def test_invented_number_falls_back_to_sanitize_when_retry_still_bad():
     still_invented = _with_example("Our LTV is $99 per customer.")
     responses = [_response(json.dumps(invented)), _response(json.dumps(still_invented))]
     with patch("lib.llm_gateway_chat", side_effect=responses) as mocked:
-        result = judge.call_judge([GREETING_TURN])
+        result = judge.call_judge([ONE_INTERRUPTION_TURN])
     example = result["interruptions"][0]["better_response_example"]
     assert "99" not in example
     assert "[X]" in example
@@ -194,3 +203,67 @@ def test_sanitize_response_example_cycles_placeholder_letters():
     text = "$45 and $99 and $150"
     sanitized = judge.sanitize_response_example(text, allowed_numbers=set())
     assert sanitized == "$[X] and $[Y] and $[Z]"
+
+
+# --- interruption-count retry and truncate fallback ----------------------------
+
+
+def _with_extra_interruption(data: dict) -> dict:
+    out = copy.deepcopy(data)
+    extra = copy.deepcopy(out["interruptions"][0])
+    extra["moment"] = "a second, fabricated interruption"
+    out["interruptions"].append(extra)
+    return out
+
+
+## These use a better_response_example with no numbers in it, so the
+## invented-number safety net stays out of the way and only the
+## interruption-count one is exercised.
+_NO_NUMBER_EXAMPLE = "Founder should have named a specific vertical instead of a broad market claim."
+
+
+def test_interruption_count_retry_succeeds_when_nothing_is_marked():
+    # This is the exact bug found on the near-empty fixture: zero marked
+    # turns, but the judge invented one interruption entry anyway.
+    too_many = _with_example(_NO_NUMBER_EXAMPLE)
+    clean = copy.deepcopy(too_many)
+    clean["interruptions"] = []
+    responses = [_response(json.dumps(too_many)), _response(json.dumps(clean))]
+    with patch("lib.llm_gateway_chat", side_effect=responses) as mocked:
+        result = judge.call_judge([GREETING_TURN])
+    assert result["interruptions"] == []
+    assert mocked.call_count == 2
+
+
+def test_interruption_count_retry_succeeds_with_one_extra_entry():
+    base = _with_example(_NO_NUMBER_EXAMPLE)
+    too_many = _with_extra_interruption(base)  # 2 entries, 1 marked turn
+    responses = [_response(json.dumps(too_many)), _response(json.dumps(base))]
+    with patch("lib.llm_gateway_chat", side_effect=responses) as mocked:
+        result = judge.call_judge([ONE_INTERRUPTION_TURN])
+    assert len(result["interruptions"]) == 1
+    assert mocked.call_count == 2
+
+
+def test_interruption_count_falls_back_to_truncate_when_retry_still_too_many():
+    base = _with_example(_NO_NUMBER_EXAMPLE)
+    too_many = _with_extra_interruption(base)
+    still_too_many = _with_extra_interruption(base)
+    responses = [_response(json.dumps(too_many)), _response(json.dumps(still_too_many))]
+    with patch("lib.llm_gateway_chat", side_effect=responses) as mocked:
+        result = judge.call_judge([ONE_INTERRUPTION_TURN])
+    assert len(result["interruptions"]) == 1
+    assert result["interruptions"][0]["moment"] == base["interruptions"][0]["moment"]
+    assert mocked.call_count == 2
+
+
+def test_sanitize_interruption_count_keeps_first_n():
+    data = _with_extra_interruption(VALID)
+    sanitized = judge._sanitize_interruption_count(data, marked_count=1)
+    assert len(sanitized["interruptions"]) == 1
+    assert sanitized["interruptions"][0] == VALID["interruptions"][0]
+
+
+def test_sanitize_interruption_count_to_zero():
+    sanitized = judge._sanitize_interruption_count(VALID, marked_count=0)
+    assert sanitized["interruptions"] == []
