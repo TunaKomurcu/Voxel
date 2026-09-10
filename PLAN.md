@@ -108,6 +108,11 @@ but it stays regardless, since it's model-independent insurance.
       goes silent, connection drop mid-call.
 - [ ] Re-test the full flow start to finish, cold (as a first-time user
       would experience it).
+- [ ] Known limitation (logged in judge_eval_log.md): judge occasionally
+      under-reports a real, marked interruption (asymmetric to the fixed
+      over-reporting case). Re-evaluate after switching JUDGE_MODEL to
+      claude-sonnet-5 — may resolve with a stronger model; if not, add a
+      symmetric "missing interruption" safety net.
 
 ## Phase 5 — Demo & submission (Days 18–20)
 - [ ] Record a 2–3 min demo video: show an interruption happening live, then
