@@ -252,6 +252,28 @@ def publish_agent(agent: dict, name: str = "", reuse_by_name: bool = False) -> d
     return {"id": created["id"], "created": True, "saved": saved, "key": key}
 
 
+# --- LLM Gateway -------------------------------------------------------------
+
+
+def _llm_gateway_base() -> str:
+    return os.environ.get("LLM_GATEWAY_BASE", "https://llm-gateway.assemblyai.com/v1")
+
+
+def llm_gateway_chat(model: str, messages: list, max_tokens: int = 1024, **kwargs: Any) -> Any:
+    """OpenAI-chat-completions-compatible, but unlike aai() the Authorization
+    header is the raw API key with no "Bearer " prefix — the one AssemblyAI
+    endpoint that differs from the Voice Agent API."""
+    headers = {
+        "Authorization": os.environ.get("ASSEMBLYAI_API_KEY", ""),
+        "Content-Type": "application/json",
+    }
+    body = {"model": model, "messages": messages, "max_tokens": max_tokens, **kwargs}
+    data = json.dumps(body).encode()
+    text = _request(_llm_gateway_base() + "/chat/completions", "POST /chat/completions",
+                     "POST", headers, data)
+    return json.loads(text) if text else {}
+
+
 # --- Twilio -----------------------------------------------------------------
 
 

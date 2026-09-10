@@ -1,0 +1,43 @@
+{
+  "session_id": "sess_da9af579775f4b52b8d8bedd999a9f70",
+  "started_at_unix_ms": 1789056541282,
+  "turns": [
+    {
+      "turn_id": "resp_45233e71d3e547a093409426e69a7b49",
+      "item_id": "msg_b57f1533b4d3483685f30575677d45d4",
+      "status": "completed",
+      "trigger": "greeting",
+      "requested_instructions": null,
+      "user_transcript": null,
+      "user_speech_started_at_ms": null,
+      "user_speech_ended_at_ms": null,
+      "user_confidence": null,
+      "agent_text": "Alright, I've got five minutes. What are you building, and why should I care?",
+      "agent_reply_started_at_ms": 1789056541679,
+      "agent_reply_ended_at_ms": 1789056545770,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 374
+    },
+    {
+      "turn_id": "resp_99e1a1902a6646839359e2407a613b88",
+      "item_id": "msg_ea84c2c3552c48efb3326d943aa1b1e1",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "Alright, so we are building the Uber of pet care. We already have.",
+      "user_speech_started_at_ms": 1789056547597,
+      "user_speech_ended_at_ms": 1789056552305,
+      "user_confidence": null,
+      "agent_text": "Cut the analogies. What is your specific unit economic model for a single transaction?",
+      "agent_reply_started_at_ms": 1789056551690,
+      "agent_reply_ended_at_ms": 1789056556581,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 1490
+    }
+  ],
+  "ended": {
+    "reason": "user_initiated",
+    "public_reason": "client_end",
+    "duration_seconds": 19.784018310546877
+  }
+}
