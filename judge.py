@@ -17,11 +17,10 @@ from typing import Any, Optional
 
 import lib
 
-# TEMPORARY: this account doesn't have LLM Gateway access to any Claude model
-# yet ("Your account does not have access to this LLM Gateway model" on both
-# claude-sonnet-5 and claude-haiku-4-5-20251001, confirmed live against
-# /v1/chat/completions). Switch back to "claude-sonnet-5" once that's enabled
-# on the AssemblyAI dashboard — see CLAUDE.md's LLM Gateway decision.
+# qwen3.5-4b-fast — the only model this account's free tier has LLM Gateway
+# access to (confirmed on the dashboard; every Claude model needs a paid
+# upgrade). A permanent choice, not a placeholder — reliable in practice
+# because of the retry + sanitize safety net in call_judge(). See PLAN.md.
 JUDGE_MODEL = "qwen3.5-4b-32k-fast"
 
 JUDGE_SYSTEM_PROMPT = """You are an objective evaluation judge for a pitch-practice call between a founder and a skeptical investor persona. You did not take part in the call; you are reading a transcript after the fact.

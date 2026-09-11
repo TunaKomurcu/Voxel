@@ -32,9 +32,13 @@ should be called out explicitly in the demo video and README.
 - Language: **Python** (matches the official `voice-agent-starter-python` repo).
 - Base: `AssemblyAI/voice-agent-starter-python`, starting from its
   `turn-taking` example agent.
-- Judge/feedback LLM: call via **AssemblyAI's LLM Gateway** (Claude), not a
-  separate Anthropic API key, to keep the API surface to one vendor for the
-  demo story.
+- Judge/feedback LLM: call via **AssemblyAI's LLM Gateway**, not a separate
+  Anthropic API key, to keep the API surface to one vendor for the demo
+  story. Model: `qwen3.5-4b-32k-fast` — every Claude model on the Gateway
+  needs a paid upgrade this account doesn't have, confirmed on the
+  dashboard, so this is the permanent choice, not a stand-in for Claude.
+  Reliability is handled by `judge.py`'s retry + sanitize safety net, not
+  by swapping to a different model. See `PLAN.md` Phase 2/4.
 - Frontend: the starter repo's existing browser client, lightly extended with
   a results panel. No framework rewrite — time budget doesn't allow it.
 - No database. Session state lives in AssemblyAI's session history API;

@@ -43,10 +43,11 @@ the agent and it interrupts at least once in a way that feels deliberate.
 reliably produces valid, parseable JSON with a score and specific feedback
 (not generic praise).
 
-**Status:** done, but `JUDGE_MODEL` in `judge.py` is temporarily
-`qwen3.5-4b-32k-fast` — this account doesn't have LLM Gateway access to any
-Claude model yet. Switch back to `claude-sonnet-5` once that's enabled on
-the AssemblyAI dashboard.
+**Status:** done. `JUDGE_MODEL` in `judge.py` is `qwen3.5-4b-32k-fast` —
+confirmed on the dashboard that every Claude model on the LLM Gateway needs
+a paid upgrade this account's free tier doesn't have. This is the permanent
+choice, not a placeholder; the retry + sanitize safety net in `call_judge()`
+(Phase 2.5/4a) is what makes it reliable enough to ship.
 
 ## Phase 2.5 — Enrich judge output (before Phase 3)
 
@@ -84,17 +85,14 @@ schema, and its `better_response_example` fields are specific to that
 conversation, not generic.
 
 **Status:** done. Live-verified against the real session — worth noting:
-`qwen3.5-4b-32k-fast` (the temporary model, see Phase 2) would not
+`qwen3.5-4b-32k-fast` (the permanent JUDGE_MODEL, see Phase 2) would not
 reliably follow the "don't invent numbers" instruction on its own, even
 after strengthening the prompt with contrastive examples, and occasionally
-returned malformed JSON. Judge output güvenlik ağı eklendi — hangi model
-kullanılırsa kullanılsın geçerli JSON + halüsinasyon olmayan sayılar garanti
-ediliyor: `call_judge()` now retries up to 3 times on invalid JSON/schema,
-and separately retries once (then falls back to a regex-based
-`sanitize_response_example()`) if `better_response_example` cites a number
-that never appeared in the transcript. Worth re-testing once Claude access
-is enabled, since a stronger model may need this safety net less often —
-but it stays regardless, since it's model-independent insurance.
+returned malformed JSON. A judge output safety net was added so this holds
+regardless of which model is behind it: `call_judge()` now retries up to 3
+times on invalid JSON/schema, and separately retries once (then falls back
+to a regex-based `sanitize_response_example()`) if `better_response_example`
+cites a number that never appeared in the transcript.
 
 ## Phase 3 — UI (Days 10–13)
 - [ ] Extend the starter's browser client with a post-call results view:
@@ -121,9 +119,11 @@ but it stays regardless, since it's model-independent insurance.
       would experience it).
 - [ ] Known limitation (logged in judge_eval_log.md): judge occasionally
       under-reports a real, marked interruption (asymmetric to the fixed
-      over-reporting case). Re-evaluate after switching JUDGE_MODEL to
-      claude-sonnet-5 — may resolve with a stronger model; if not, add a
-      symmetric "missing interruption" safety net.
+      over-reporting case). Not tied to a model swap — `qwen3.5-4b-32k-fast`
+      is the permanent JUDGE_MODEL now (see Phase 2 status). A separate
+      improvement opportunity to pick up if it matters: tighten the prompt
+      further, or add a symmetric "missing interruption" safety net (the
+      same retry-then-fix pattern as the over-reporting fix, mirrored).
 
 ## Phase 5 — Demo & submission (Days 18–20)
 - [ ] Record a 2–3 min demo video: show an interruption happening live, then
