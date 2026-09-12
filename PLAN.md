@@ -108,7 +108,14 @@ cites a number that never appeared in the transcript.
         `run_judge_pass` doesn't crash on an empty `interruptions` list, and
         the UI shows a dedicated (non-generic, score-agnostic) message
         instead of an empty-looking panel.
-  - [ ] User goes silent mid-sentence (not yet tested).
+  - [x] User goes silent mid-sentence — `tests/fixtures/hesitation_session.json`.
+        Found the timing-based barge-in signal misses these entirely (the
+        agent starts *after* `user_speech_ended_at_ms` on a silence-timeout
+        cutoff, same range as an un-interrupted reply); added a text-based
+        `hesitation_cutoff` signal alongside the timing-based `barge_in`
+        one, and a deterministic type-to-trigger mapping in the judge
+        prompt so `hesitation_cutoff` always maps to `trigger: "hesitation"`
+        instead of the judge guessing from content.
   - [x] Connection drop mid-call — `server.py`'s `_send()` and the new
         `Server.handle_error()` log a clean line instead of a traceback
         when a client (browser tab) disconnects mid-request, and the
@@ -124,6 +131,54 @@ cites a number that never appeared in the transcript.
       improvement opportunity to pick up if it matters: tighten the prompt
       further, or add a symmetric "missing interruption" safety net (the
       same retry-then-fix pattern as the over-reporting fix, mirrored).
+
+## Phase 4b — Multi-persona support (stretch goal)
+
+Four counterparts to practice against instead of one: Marcus (Investor,
+existing) plus three new ones, each its own `agents/*.jsonc` with its own
+persona and turn-detection tuning.
+
+- [x] `agents/technical-cofounder.jsonc` — Priya, a skeptical technical
+      co-founder candidate. Probes mechanism-level depth ("what breaks at
+      10x", "is that actually automatic"), not domain trivia. Less
+      aggressive turn-detection than Marcus (`min_silence: 400` vs `300`)
+      — this persona is testing depth, not speed.
+- [x] `agents/non-technical-buyer.jsonc` — Grace, a non-technical enterprise
+      buyer who gets lost in jargon. Interrupts rarely, only out of real
+      confusion ("I still don't understand that"). Highest `min_silence`
+      of the four (`550`) — patience is the point.
+- [x] `agents/impatient-buyer.jsonc` — Derek, an impatient enterprise buyer
+      (a customer, not an investor) focused on concrete ROI/cost/timeline.
+      About as aggressive as Marcus (`min_silence: 320`).
+- [x] All three published; `.env` has `AGENT_ID_TECHNICAL_COFOUNDER`,
+      `AGENT_ID_NON_TECHNICAL_BUYER`, `AGENT_ID_IMPATIENT_BUYER`.
+- [x] Persona selection moved client-side: `server.py` resolves all four at
+      startup into a `PERSONAS` registry and embeds them as
+      `window.PERSONAS`; the browser picks which `agent_id` to send in the
+      websocket's `session.update` message. (The `/token` endpoint needed
+      no change — it was already agent-agnostic; agent selection has
+      always happened over the websocket, not at token-mint time. The
+      starter's single-agent `AGENT=<name>` env var still works as a
+      legacy override for testing any other `agents/*.jsonc` file.)
+      `index.html` gets a persona `<select>` before "Start call",
+      defaulting to Marcus; disabled during an active call like the mic
+      picker. The sidebar's read-only "Agent" tab now takes `/agent?key=`
+      and refetches on persona change.
+- [x] Judge prompt generalized for multi-persona: `run_judge_pass` extracts
+      a `counterpart_description` from the session's own
+      `config.system_prompt` (its first sentence — every persona's prompt
+      opens with "You are `<Name>`, a `<role>`...", so no separate registry
+      to keep in sync) and passes it to the judge as context.
+      `JUDGE_SYSTEM_PROMPT`'s "investor"-specific language is now
+      "counterpart," and `audience_responsiveness` is explicitly judged
+      against what *that* counterpart cares about (mechanism depth for
+      Priya, plain language for Grace, ROI/cost/timeline for Derek) instead
+      of investor-pitch assumptions. Trigger enum unchanged — already
+      general enough.
+- [ ] Manually test at least one call with each of the three new personas;
+      confirm the interruption tuning feels intentional (see PLAN.md's
+      "quick manual test after every agents/*.jsonc change" rule) and that
+      judge feedback tracks the right thing for that counterpart.
 
 ## Phase 5 — Demo & submission (Days 18–20)
 - [ ] Record a 2–3 min demo video: show an interruption happening live, then

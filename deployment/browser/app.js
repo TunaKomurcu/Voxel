@@ -4,7 +4,8 @@ const $ = (id) => document.getElementById(id)
 // The rate the API speaks. Both worklets resample, since a browser may
 // ignore the rate an AudioContext asks for.
 const WIRE_RATE = 24_000
-const AGENT = window.AGENT
+const PERSONAS = window.PERSONAS
+let selectedPersona = PERSONAS[0]
 
 // Scratch buffers are reused: allocating on the audio thread causes glitches.
 const CAPTURE_WORKLET = `
@@ -172,6 +173,26 @@ async function listMics() {
 listMics()
 navigator.mediaDevices?.addEventListener?.('devicechange', listMics)
 
+// --- persona selection ---
+function listPersonas() {
+  const select = $('persona')
+  select.replaceChildren()
+  PERSONAS.forEach((p) => {
+    const option = document.createElement('option')
+    option.value = p.key
+    option.textContent = p.label || p.name
+    select.append(option)
+  })
+  select.value = selectedPersona.key
+}
+listPersonas()
+
+$('persona').onchange = () => {
+  selectedPersona = PERSONAS.find((p) => p.key === $('persona').value) || PERSONAS[0]
+  // Refresh the sidebar's read-only agent view if it's the one showing.
+  if (!$('agent-body').hidden) loadAgentTab()
+}
+
 $('btn').onclick = () => (ws?.readyState <= 1 ? stop() : start())
 $('log-toggle').onclick = () => {
   const hidden = document.body.classList.toggle('no-side')
@@ -179,28 +200,31 @@ $('log-toggle').onclick = () => {
 }
 
 // --- side pane tabs ---
-let agentLoaded = false
+function loadAgentTab() {
+  $('agent-body').replaceChildren()
+  const loading = document.createElement('div')
+  loading.className = 'empty'
+  loading.textContent = 'Loading the published agent.'
+  $('agent-body').append(loading)
+  fetch('/agent?key=' + encodeURIComponent(selectedPersona.key))
+    .then((res) => res.json())
+    .then((agent) => {
+      $('agent-body').replaceChildren()
+      const pre = document.createElement('pre')
+      pre.textContent = JSON.stringify(agent, null, 2)
+      $('agent-body').append(pre)
+    })
+    .catch(() => {
+      $('agent-body').textContent = 'Could not load the agent.'
+    })
+}
 
 function showTab(name) {
   for (const tab of ['events', 'agent']) {
     $('tab-' + tab).classList.toggle('on', tab === name)
     $(tab + '-body').hidden = tab !== name
   }
-  if (name === 'agent' && !agentLoaded) {
-    agentLoaded = true
-    fetch('/agent')
-      .then((res) => res.json())
-      .then((agent) => {
-        $('agent-body').replaceChildren()
-        const pre = document.createElement('pre')
-        pre.textContent = JSON.stringify(agent, null, 2)
-        $('agent-body').append(pre)
-      })
-      .catch(() => {
-        agentLoaded = false
-        $('agent-body').textContent = 'Could not load the agent.'
-      })
-  }
+  if (name === 'agent') loadAgentTab()
 }
 $('tab-events').onclick = () => showTab('events')
 $('tab-agent').onclick = () => showTab('agent')
@@ -218,6 +242,7 @@ async function addWorklet(ctx, code, name) {
 async function start() {
   $('btn').disabled = true
   $('mic').disabled = true
+  $('persona').disabled = true
   setStatus('connecting')
   hideResults()
 
@@ -273,8 +298,8 @@ async function start() {
 
     // Everything about the agent lives server-side; the session just names it.
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'session.update', session: { agent_id: AGENT.id } }))
-      logEvent('up', 'session.update', AGENT.id)
+      ws.send(JSON.stringify({ type: 'session.update', session: { agent_id: selectedPersona.id } }))
+      logEvent('up', 'session.update', selectedPersona.id)
     }
 
     ws.onmessage = ({ data }) => {
@@ -406,6 +431,7 @@ function reset() {
   open.clear()
   $('btn').disabled = false
   $('mic').disabled = false
+  $('persona').disabled = false
   $('btn').textContent = 'Start call'
   $('btn').classList.remove('live')
 }
@@ -459,7 +485,7 @@ function transcriptLine(who, text, cls) {
   line.className = 'line ' + who + (cls ? ' ' + cls : '')
   const label = document.createElement('span')
   label.className = 'who'
-  label.textContent = who === 'agent' ? AGENT.name : who
+  label.textContent = who === 'agent' ? selectedPersona.name : who
   const body = document.createElement('span')
   body.className = 'said'
   body.textContent = text

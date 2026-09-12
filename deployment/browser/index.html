@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light dark">
-<title>{{AGENT_NAME}}</title>
+<title>Voxel</title>
 <style>
   /* Tokens taken from assemblyai.com. The three typefaces are licensed and
      not bundled here, so each falls back the same way the site's own stack
@@ -196,7 +196,8 @@
 <body>
 <main>
   <header>
-    <h1>{{AGENT_NAME}}</h1>
+    <h1>Voxel</h1>
+    <select id="persona" aria-label="Counterpart persona"></select>
     <span class="status idle" id="status"><span id="status-text">idle</span></span>
     <span class="meter"><span id="elapsed">0:00</span><span id="cost">$0.000</span></span>
   </header>
@@ -241,7 +242,7 @@
     </div>
   </section>
 </main>
-<script>window.AGENT = {{AGENT_JSON}}</script>
+<script>window.PERSONAS = {{PERSONAS_JSON}}</script>
 <script src="/app.js"></script>
 </body>
 </html>

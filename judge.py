@@ -23,21 +23,23 @@ import lib
 # because of the retry + sanitize safety net in call_judge(). See PLAN.md.
 JUDGE_MODEL = "qwen3.5-4b-32k-fast"
 
-JUDGE_SYSTEM_PROMPT = """You are an objective evaluation judge for a pitch-practice call between a founder and a skeptical investor persona. You did not take part in the call; you are reading a transcript after the fact.
+JUDGE_SYSTEM_PROMPT = """You are an objective evaluation judge for a practice call between a founder and a skeptical counterpart persona — an investor, a technical co-founder candidate, or a buyer, depending on the session. You did not take part in the call; you are reading a transcript after the fact.
 
-Lines marked (INTERRUPTION: <type>) are moments the investor cut the founder off. Some carry a bracketed timing note (pre-interrupt speech rate, response latency, recovery speech rate, in words/sec and milliseconds) — treat it as one more signal about composure, not something to repeat verbatim. The transcript may be followed by a block of sentence-level sentiment analysis; match those sentences to the transcript by their text, not by position, and use them as context for tone, not as a separate topic to discuss.
+The user message names the specific counterpart for this call (who they are, what they're evaluating). Use that to judge "audience_responsiveness": what counts as a responsive answer depends on what THIS counterpart actually cares about. A technical co-founder wants mechanism-level depth ("how does it actually work," "what breaks at scale") — jargon-free plain language is not what they're asking for. A non-technical buyer wants plain language and gets frustrated by jargon, not by a lack of technical depth. A buyer focused on cost and timeline wants concrete ROI/price/speed, not market size or investor-style traction metrics. Don't import investor-pitch assumptions into a call where the counterpart never asked about those things.
+
+Lines marked (INTERRUPTION: <type>) are moments the counterpart cut the founder off. Some carry a bracketed timing note (pre-interrupt speech rate, response latency, recovery speech rate, in words/sec and milliseconds) — treat it as one more signal about composure, not something to repeat verbatim. The transcript may be followed by a block of sentence-level sentiment analysis; match those sentences to the transcript by their text, not by position, and use them as context for tone, not as a separate topic to discuss.
 
 The type after the colon tells you which of two distinct mechanisms caused the cut-in — use it to fix "trigger", don't guess from content when the type already answers it:
-- "hesitation_cutoff": the founder trailed off and the investor's turn-detection treated the pause as the end of their turn. This is not a claim, a number, or a dodge — always use trigger: "hesitation" for these.
-- "barge_in": the investor talked over the founder mid-sentence because of what was being said. Pick the trigger from the actual content: "vague_claim", "unsupported_number", or "ignored_question".
+- "hesitation_cutoff": the founder trailed off and the counterpart's turn-detection treated the pause as the end of their turn. This is not a claim, a number, or a dodge — always use trigger: "hesitation" for these.
+- "barge_in": the counterpart talked over the founder mid-sentence because of what was being said. Pick the trigger from the actual content: "vague_claim", "unsupported_number", or "ignored_question".
 
 Only put an entry in "interruptions" for a line that is actually marked (INTERRUPTION: <type>) below. Do not add an entry for any other turn, no matter how weak it was — if nothing in the transcript is marked, "interruptions" must be an empty list, even if the founder said little or nothing.
 
-For each interruption, judge how well the founder recovered in their next turn: did they answer the investor's sharp follow-up specifically, or did they stay vague, dodge, or restate the same hand-wavy claim?
+For each interruption, judge how well the founder recovered in their next turn: did they answer the counterpart's sharp follow-up specifically, or did they stay vague, dodge, or restate the same hand-wavy claim?
 
-Every "recovery_pattern" must be grounded in what was literally said, not assumed. A bare acknowledgment ("okay", "alright", "sure") contains no claim. "recovery_pattern: answered_directly" requires the founder's next turn to state new, concrete information — a number, a name, a specific mechanism. Repeating what they already said, turning the question back on the investor, or a bare acknowledgment is "deflected", "repeated_claim", or "asked_clarifying_question" — never "answered_directly".
+Every "recovery_pattern" must be grounded in what was literally said, not assumed. A bare acknowledgment ("okay", "alright", "sure") contains no claim. "recovery_pattern: answered_directly" requires the founder's next turn to state new, concrete information — a number, a name, a specific mechanism. Repeating what they already said, turning the question back on the counterpart, or a bare acknowledgment is "deflected", "repeated_claim", or "asked_clarifying_question" — never "answered_directly".
 
-Content substance and the overall score must track how much real information the founder actually gave, not how politely they behaved. A one-word acknowledgment, a topic change, or turning the question back on the investor earns a low content_substance score and a low overall_score — good composure or a pleasant tone never offsets a lack of content. If the founder gave little or no substantive information for the entire call, overall_score must be low — well under 40 — regardless of how the rest of the call went.
+Content substance and the overall score must track how much real information the founder actually gave, not how politely they behaved. A one-word acknowledgment, a topic change, or turning the question back on the counterpart earns a low content_substance score and a low overall_score — good composure or a pleasant tone never offsets a lack of content. If the founder gave little or no substantive information for the entire call, overall_score must be low — well under 40 — regardless of how the rest of the call went.
 
 `better_response_example` must reference something specific and real from THIS transcript — an exact number, claim, or phrase the founder actually said or should have said instead. Generic coaching sentences ("be more specific", "add more data", "provide concrete numbers") are not acceptable.
 
@@ -70,7 +72,7 @@ Return ONLY valid JSON, no prose before or after, matching exactly this shape:
   "suggestions": ["<actionable suggestion>", "..."]
 }
 
-If there were no interruptions in the transcript, base the scores on general pitch clarity, return an empty "interruptions" list, and still give 1-3 specific suggestions grounded in what was actually said."""
+If there were no interruptions in the transcript, base the scores on how clearly the founder communicated overall, return an empty "interruptions" list, and still give 1-3 specific suggestions grounded in what was actually said."""
 
 
 # --- session + timeline ------------------------------------------------------
@@ -252,7 +254,8 @@ def _timing_note(turn: dict) -> str:
     return f" [{'; '.join(bits)}]" if bits else ""
 
 
-def build_judge_prompt(turns: list[dict], sentiment_results: Optional[list[dict]] = None) -> list[dict]:
+def build_judge_prompt(turns: list[dict], sentiment_results: Optional[list[dict]] = None,
+                        counterpart_description: Optional[str] = None) -> list[dict]:
     lines = []
     for turn in turns:
         if turn.get("user_transcript"):
@@ -260,8 +263,12 @@ def build_judge_prompt(turns: list[dict], sentiment_results: Optional[list[dict]
         if turn.get("agent_text"):
             itype = turn.get("interruption_type")
             marker = f" (INTERRUPTION: {itype}){_timing_note(turn)}" if itype else ""
-            lines.append(f"[Investor{marker}]: {turn['agent_text']}")
-    content = f"Transcript:\n\n{chr(10).join(lines)}"
+            lines.append(f"[Counterpart{marker}]: {turn['agent_text']}")
+    parts = []
+    if counterpart_description:
+        parts.append(f"Counterpart: {counterpart_description}")
+    parts.append(f"Transcript:\n\n{chr(10).join(lines)}")
+    content = "\n\n".join(parts)
     if sentiment_results:
         content += "\n\n" + _format_sentiment_context(sentiment_results)
     return [
@@ -385,9 +392,10 @@ def _sanitize_interruption_count(data: dict, marked_count: int) -> dict:
 
 
 def call_judge(turns: list[dict], model: str = JUDGE_MODEL,
-                sentiment_results: Optional[list[dict]] = None) -> dict:
+                sentiment_results: Optional[list[dict]] = None,
+                counterpart_description: Optional[str] = None) -> dict:
     annotated = compute_timing_signals(turns)
-    messages = build_judge_prompt(annotated, sentiment_results)
+    messages = build_judge_prompt(annotated, sentiment_results, counterpart_description)
     allowed_numbers = _extract_numbers(_dialogue_text(turns))
     marked_count = len(interruption_turns(annotated))
 
@@ -445,6 +453,17 @@ def _wait_for_artifact(session_id: str, artifact_type: str, timeout: float = 20.
     return session, url
 
 
+def _counterpart_description(session: dict) -> Optional[str]:
+    """The first sentence of the agent's own system prompt — by convention
+    every persona's prompt opens with "You are <Name>, a <role>..." — tells
+    the judge who the founder was actually talking to, without needing a
+    separate persona registry here that would drift out of sync as personas
+    are added (see agents/*.jsonc)."""
+    prompt = session.get("config", {}).get("system_prompt", "")
+    first_sentence = prompt.split(".", 1)[0].strip()
+    return f"{first_sentence}." if first_sentence else None
+
+
 def run_judge_pass(session_id: str, model: str = JUDGE_MODEL, include_sentiment: bool = True) -> dict:
     """The single entry point the UI calls: a session id in, validated judge
     JSON out. Sentiment analysis is best-effort — a failure there (gateway
@@ -455,6 +474,7 @@ def run_judge_pass(session_id: str, model: str = JUDGE_MODEL, include_sentiment:
     with urllib.request.urlopen(timeline_url) as res:
         timeline = json.loads(res.read().decode())
     turns = parse_timeline(timeline)
+    counterpart_description = _counterpart_description(session)
 
     sentiment_results = None
     if include_sentiment:
@@ -465,7 +485,8 @@ def run_judge_pass(session_id: str, model: str = JUDGE_MODEL, include_sentiment:
             except Exception as err:
                 print(f"Warning: sentiment analysis failed, continuing without it: {err}")
 
-    return call_judge(turns, model=model, sentiment_results=sentiment_results)
+    return call_judge(turns, model=model, sentiment_results=sentiment_results,
+                       counterpart_description=counterpart_description)
 
 
 # --- schema validation ---------------------------------------------------------

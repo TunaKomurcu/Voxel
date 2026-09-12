@@ -22,9 +22,20 @@ from lib import (ApiError, aai, load_env, publish_agent, read_agent,  # noqa: E4
 import judge  # noqa: E402
 
 
-def resolve_agent() -> dict:
+# The four Voxel personas, selectable in the browser before a call starts.
+# Overridden entirely by the starter's usual AGENT=<name> env var (single
+# agent, e.g. AGENT=http-tools), which still works for testing any other
+# agents/*.jsonc file the way the README describes.
+PERSONAS = [
+    {"key": "investor", "file": "voxel-investor", "label": "Marcus — Investor"},
+    {"key": "technical", "file": "technical-cofounder", "label": "Priya — Technical Co-founder"},
+    {"key": "buyer", "file": "non-technical-buyer", "label": "Grace — Non-technical Buyer"},
+    {"key": "enterprise", "file": "impatient-buyer", "label": "Derek — Impatient Enterprise Buyer"},
+]
+
+
+def resolve_agent(name: str) -> dict:
     """A published id means the agent is managed elsewhere, so use it as it is."""
-    name = os.environ.get("AGENT", "minimal")
     known = stored_agent_id(name)
     if known:
         try:
@@ -55,7 +66,7 @@ def public_agent(agent: dict) -> dict:
     return copied
 
 
-AGENT = None
+RESOLVED_PERSONAS: list = []
 PAGE = ""
 
 
@@ -102,8 +113,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(502, b'{"error":"token request failed"}', "application/json")
             return
         if path == "/agent":
+            key = (query.get("key") or [""])[0]
+            entry = next((p for p in RESOLVED_PERSONAS if p["key"] == key), None)
+            if entry is None:
+                self._send(400, b'{"error":"unknown persona key"}', "application/json")
+                return
             try:
-                agent = aai(f"/agents/{AGENT['id']}")
+                agent = aai(f"/agents/{entry['id']}")
                 self._send(200, json.dumps(public_agent(agent)).encode(), "application/json")
             except ApiError as err:
                 print(err)
@@ -134,15 +150,26 @@ class Server(ThreadingHTTPServer):
 
 
 def main() -> None:
-    global AGENT, PAGE
+    global RESOLVED_PERSONAS, PAGE
     load_env()
     required("ASSEMBLYAI_API_KEY", "get one at https://www.assemblyai.com/dashboard/api-keys")
 
-    AGENT = resolve_agent()
-    print(f"Agent: {AGENT['id']}")
+    if os.environ.get("AGENT"):
+        # Legacy single-agent mode: AGENT=<name> from the starter's own
+        # convention (e.g. AGENT=http-tools), still useful for testing any
+        # other agents/*.jsonc file one at a time.
+        name = os.environ["AGENT"]
+        RESOLVED_PERSONAS = [{"key": "default", "label": None, **resolve_agent(name)}]
+        print(f"Agent: {RESOLVED_PERSONAS[0]['id']} (single-agent mode, AGENT={name})")
+    else:
+        RESOLVED_PERSONAS = [
+            {"key": p["key"], "label": p["label"], **resolve_agent(p["file"])} for p in PERSONAS
+        ]
+        for p in RESOLVED_PERSONAS:
+            print(f"Persona: {p['label']} -> {p['id']}")
+
     PAGE = ((HERE / "index.html").read_text()
-            .replace("{{AGENT_NAME}}", AGENT["name"])
-            .replace("{{AGENT_JSON}}", json.dumps(AGENT).replace("<", "\\u003c")))
+            .replace("{{PERSONAS_JSON}}", json.dumps(RESOLVED_PERSONAS).replace("<", "\\u003c")))
 
     # PORT when set, otherwise 3000 and up until one is free.
     fixed = os.environ.get("PORT")
