@@ -26,11 +26,14 @@ import judge  # noqa: E402
 # Overridden entirely by the starter's usual AGENT=<name> env var (single
 # agent, e.g. AGENT=http-tools), which still works for testing any other
 # agents/*.jsonc file the way the README describes.
+# short_name is the persona's own first name, used in the transcript
+# ("Priya: ...") — distinct from "name", which resolve_agent() fills in
+# from the agent's stored dashboard name ("Voxel Technical Co-founder").
 PERSONAS = [
-    {"key": "investor", "file": "voxel-investor", "label": "Marcus — Investor"},
-    {"key": "technical", "file": "technical-cofounder", "label": "Priya — Technical Co-founder"},
-    {"key": "buyer", "file": "non-technical-buyer", "label": "Grace — Non-technical Buyer"},
-    {"key": "enterprise", "file": "impatient-buyer", "label": "Derek — Impatient Enterprise Buyer"},
+    {"key": "investor", "file": "voxel-investor", "label": "Marcus — Investor", "short_name": "Marcus"},
+    {"key": "technical", "file": "technical-cofounder", "label": "Priya — Technical Co-founder", "short_name": "Priya"},
+    {"key": "buyer", "file": "non-technical-buyer", "label": "Grace — Non-technical Buyer", "short_name": "Grace"},
+    {"key": "enterprise", "file": "impatient-buyer", "label": "Derek — Impatient Enterprise Buyer", "short_name": "Derek"},
 ]
 
 
@@ -159,11 +162,13 @@ def main() -> None:
         # convention (e.g. AGENT=http-tools), still useful for testing any
         # other agents/*.jsonc file one at a time.
         name = os.environ["AGENT"]
-        RESOLVED_PERSONAS = [{"key": "default", "label": None, **resolve_agent(name)}]
+        resolved = resolve_agent(name)
+        RESOLVED_PERSONAS = [{"key": "default", "label": None, "short_name": resolved["name"], **resolved}]
         print(f"Agent: {RESOLVED_PERSONAS[0]['id']} (single-agent mode, AGENT={name})")
     else:
         RESOLVED_PERSONAS = [
-            {"key": p["key"], "label": p["label"], **resolve_agent(p["file"])} for p in PERSONAS
+            {"key": p["key"], "label": p["label"], "short_name": p["short_name"], **resolve_agent(p["file"])}
+            for p in PERSONAS
         ]
         for p in RESOLVED_PERSONAS:
             print(f"Persona: {p['label']} -> {p['id']}")

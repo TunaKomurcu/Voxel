@@ -183,12 +183,25 @@ function listPersonas() {
     option.textContent = p.label || p.name
     select.append(option)
   })
+  const surprise = document.createElement('option')
+  surprise.value = 'surprise'
+  surprise.textContent = '\u{1F3B2} Surprise me'
+  select.append(surprise)
   select.value = selectedPersona.key
 }
 listPersonas()
 
 $('persona').onchange = () => {
-  selectedPersona = PERSONAS.find((p) => p.key === $('persona').value) || PERSONAS[0]
+  const value = $('persona').value
+  if (value === 'surprise') {
+    // One-shot: resolves immediately to a real persona and reveals it by
+    // snapping the dropdown to that name, rather than staying on
+    // "Surprise me" as a hidden, persisted choice. Picking it again rerolls.
+    selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)]
+    $('persona').value = selectedPersona.key
+  } else {
+    selectedPersona = PERSONAS.find((p) => p.key === value) || PERSONAS[0]
+  }
   // Refresh the sidebar's read-only agent view if it's the one showing.
   if (!$('agent-body').hidden) loadAgentTab()
 }
@@ -485,7 +498,7 @@ function transcriptLine(who, text, cls) {
   line.className = 'line ' + who + (cls ? ' ' + cls : '')
   const label = document.createElement('span')
   label.className = 'who'
-  label.textContent = who === 'agent' ? selectedPersona.name : who
+  label.textContent = who === 'agent' ? (selectedPersona.short_name || selectedPersona.name) : who
   const body = document.createElement('span')
   body.className = 'said'
   body.textContent = text
