@@ -53,8 +53,14 @@
     }
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; }
+  html { height: 100%; }
   body {
+    /* min-height, not height: the call panes fill one screen when that's
+       all there is, but the page must grow past 100% and scroll normally
+       once Feedback/Progress add content below — a fixed height instead
+       forced everything into one viewport and crushed the call UI down to
+       almost nothing to make room. */
+    min-height: 100%;
     font-family: var(--font-body); font-size: 16px; line-height: 1.3;
     color: var(--text); background: var(--page-bg); display: flex;
     flex-direction: column; align-items: center; padding: 24px 20px 20px;
@@ -86,7 +92,7 @@
   #elapsed { min-width: 34px; text-align: right; }
   #cost { min-width: 48px; text-align: right; }
 
-  .panes { flex: 1; min-height: 0; display: grid; gap: 16px;
+  .panes { flex: 1; min-height: 420px; display: grid; gap: 16px;
            grid-template-columns: 1fr 360px; }
   body.no-side .panes { grid-template-columns: 1fr; }
   body.no-side #side { display: none; }
