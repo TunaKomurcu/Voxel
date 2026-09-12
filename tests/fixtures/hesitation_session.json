@@ -1,0 +1,91 @@
+{
+  "session_id": "sess_6846447d76b745a6aa3b7165c171de1a",
+  "started_at_unix_ms": 1789211495697,
+  "turns": [
+    {
+      "turn_id": "resp_1f9785b52ec8478b8080688984f7c194",
+      "item_id": "msg_e00dc4d0afb8437bbfadb379e1da4529",
+      "status": "completed",
+      "trigger": "greeting",
+      "requested_instructions": null,
+      "user_transcript": null,
+      "user_speech_started_at_ms": null,
+      "user_speech_ended_at_ms": null,
+      "user_confidence": null,
+      "agent_text": "Alright, I've got five minutes. What are you building, and why should I care?",
+      "agent_reply_started_at_ms": 1789211496094,
+      "agent_reply_ended_at_ms": 1789211500746,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 365
+    },
+    {
+      "turn_id": "resp_ce89d4cdd98f49bba8e20f645f9d53a4",
+      "item_id": "msg_42dd8ac0834a42ed8740721916dafd31",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "So our monthly growth rate is",
+      "user_speech_started_at_ms": 1789211503319,
+      "user_speech_ended_at_ms": 1789211506495,
+      "user_confidence": 1.0,
+      "agent_text": "What is the exact percentage and how many paying customers does that represent?",
+      "agent_reply_started_at_ms": 1789211508050,
+      "agent_reply_ended_at_ms": 1789211512622,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 1553
+    },
+    {
+      "turn_id": "user_speech_1",
+      "item_id": "",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "55%.",
+      "user_speech_started_at_ms": 1789211515919,
+      "user_speech_ended_at_ms": null,
+      "user_confidence": 1.0,
+      "agent_text": null,
+      "agent_reply_started_at_ms": null,
+      "agent_reply_ended_at_ms": null,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": null
+    },
+    {
+      "turn_id": "resp_e57249be9fad4ae4a278dc586e70d5df",
+      "item_id": "msg_ab16db183d7c46c294e03a0c5b08ae33",
+      "status": "completed",
+      "trigger": "greeting",
+      "requested_instructions": null,
+      "user_transcript": null,
+      "user_speech_started_at_ms": null,
+      "user_speech_ended_at_ms": null,
+      "user_confidence": null,
+      "agent_text": "Is that based on gross revenue or net new users?",
+      "agent_reply_started_at_ms": null,
+      "agent_reply_ended_at_ms": 1789211520937,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": null
+    },
+    {
+      "turn_id": "resp_e01c7733351a4638b16669d1900caa88",
+      "item_id": "msg_3f666dd0fe394a7c9d46d8aaebcdf6d2",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "So it's based on",
+      "user_speech_started_at_ms": 1789211526319,
+      "user_speech_ended_at_ms": 1789211529596,
+      "user_confidence": 1.0,
+      "agent_text": "Don't stall. Is that number driven by actual dollars or just user signups?",
+      "agent_reply_started_at_ms": 1789211530402,
+      "agent_reply_ended_at_ms": 1789211535134,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 803
+    }
+  ],
+  "ended": {
+    "reason": "user_initiated",
+    "public_reason": "client_end",
+    "duration_seconds": 43.80493725585937
+  }
+}

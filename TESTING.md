@@ -79,6 +79,23 @@ Current fixture set (grows as new edge cases turn up in manual testing):
   `agent_text: "If"`) — confirmed this doesn't get flagged as our kind of
   interruption and doesn't feed into any timing signal (see the comment
   above `compute_timing_signals` in `judge.py`).
+- `hesitation_session.json` — a real call with two deliberate mid-sentence
+  pauses ("So our monthly growth rate is" / "So it's based on"). Found that
+  the timing-based barge-in signal misses these entirely: the agent starts
+  800ms-1.5s *after* `user_speech_ended_at_ms` for a silence-timeout
+  cutoff, the same range as a normal, un-interrupted reply, so elapsed time
+  alone can't tell the two apart (compare against `no_interruption_session.json`'s
+  777-1337ms gaps on turns that were never cut off). Added a second,
+  text-based signal (`_is_hesitation_cutoff`: transcript trails off without
+  `. ? !`) and an `interruption_type` field (`"barge_in"` vs.
+  `"hesitation_cutoff"`) so the judge prompt can force `trigger: "hesitation"`
+  for the latter instead of guessing from content. **Known risk**: the text
+  signal depends on the ASR's punctuation being reliable — a short, naturally
+  unpunctuated answer ("Yes", "No") could in principle misread as a false
+  hesitation cutoff. Not observed in any fixture yet (every genuinely
+  complete turn across all four fixtures ends in `. ? !`), but worth
+  watching for as more real calls come in — see the docstring on
+  `_is_hesitation_cutoff` in `judge.py`.
 
 What to check when reading the log:
 - Does the score vary wildly between runs on the same fixture (bad — prompt

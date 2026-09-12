@@ -25,13 +25,17 @@ JUDGE_MODEL = "qwen3.5-4b-32k-fast"
 
 JUDGE_SYSTEM_PROMPT = """You are an objective evaluation judge for a pitch-practice call between a founder and a skeptical investor persona. You did not take part in the call; you are reading a transcript after the fact.
 
-Lines marked (INTERRUPTION) are moments the investor cut the founder off. Some carry a bracketed timing note (pre-interrupt speech rate, response latency, recovery speech rate, in words/sec and milliseconds) — treat it as one more signal about composure, not something to repeat verbatim. The transcript may be followed by a block of sentence-level sentiment analysis; match those sentences to the transcript by their text, not by position, and use them as context for tone, not as a separate topic to discuss.
+Lines marked (INTERRUPTION: <type>) are moments the investor cut the founder off. Some carry a bracketed timing note (pre-interrupt speech rate, response latency, recovery speech rate, in words/sec and milliseconds) — treat it as one more signal about composure, not something to repeat verbatim. The transcript may be followed by a block of sentence-level sentiment analysis; match those sentences to the transcript by their text, not by position, and use them as context for tone, not as a separate topic to discuss.
 
-Only put an entry in "interruptions" for a line that is actually marked (INTERRUPTION) below. Do not add an entry for any other turn, no matter how weak it was — if nothing in the transcript is marked (INTERRUPTION), "interruptions" must be an empty list, even if the founder said little or nothing.
+The type after the colon tells you which of two distinct mechanisms caused the cut-in — use it to fix "trigger", don't guess from content when the type already answers it:
+- "hesitation_cutoff": the founder trailed off and the investor's turn-detection treated the pause as the end of their turn. This is not a claim, a number, or a dodge — always use trigger: "hesitation" for these.
+- "barge_in": the investor talked over the founder mid-sentence because of what was being said. Pick the trigger from the actual content: "vague_claim", "unsupported_number", or "ignored_question".
+
+Only put an entry in "interruptions" for a line that is actually marked (INTERRUPTION: <type>) below. Do not add an entry for any other turn, no matter how weak it was — if nothing in the transcript is marked, "interruptions" must be an empty list, even if the founder said little or nothing.
 
 For each interruption, judge how well the founder recovered in their next turn: did they answer the investor's sharp follow-up specifically, or did they stay vague, dodge, or restate the same hand-wavy claim?
 
-Every "trigger" and "recovery_pattern" must be grounded in what was literally said, not assumed. "vague_claim" requires the founder to have actually made a claim — a statement about their product, market, or traction that lacked support. A bare acknowledgment ("okay", "alright", "sure") contains no claim, so it is never vague_claim; if the founder said nothing substantive before being cut off, use whichever trigger actually fits (often hesitation), not vague_claim by default. "recovery_pattern: answered_directly" requires the founder's next turn to state new, concrete information — a number, a name, a specific mechanism. Repeating what they already said, turning the question back on the investor, or a bare acknowledgment is "deflected", "repeated_claim", or "asked_clarifying_question" — never "answered_directly".
+Every "recovery_pattern" must be grounded in what was literally said, not assumed. A bare acknowledgment ("okay", "alright", "sure") contains no claim. "recovery_pattern: answered_directly" requires the founder's next turn to state new, concrete information — a number, a name, a specific mechanism. Repeating what they already said, turning the question back on the investor, or a bare acknowledgment is "deflected", "repeated_claim", or "asked_clarifying_question" — never "answered_directly".
 
 Content substance and the overall score must track how much real information the founder actually gave, not how politely they behaved. A one-word acknowledgment, a topic change, or turning the question back on the investor earns a low content_substance score and a low overall_score — good composure or a pleasant tone never offsets a lack of content. If the founder gave little or no substantive information for the entire call, overall_score must be low — well under 40 — regardless of how the rest of the call went.
 
@@ -90,23 +94,62 @@ def fetch_timeline(session_id: str) -> dict:
         return json.loads(res.read().decode())
 
 
-def _is_interruption(turn: dict) -> bool:
-    """Primary signal: the agent's reply started at or before the moment
-    AssemblyAI's own turn-detection marked the user's speech as ended — a
-    real barge-in, confirmed against a live session. Falls back to a text
-    heuristic (unpunctuated, trailing transcript) when timing is missing."""
-    if turn.get("trigger") != "user_speech":
-        return False
+def _is_barge_in(turn: dict) -> bool:
+    """The agent's reply started at or before the moment AssemblyAI's own
+    turn-detection marked the user's speech as ended — a real audio-level
+    barge-in, confirmed against a live session (the "Uber of pet care" call
+    in sample_session_timeline.json)."""
     started = turn.get("agent_reply_started_at_ms")
     ended = turn.get("user_speech_ended_at_ms")
-    if started is not None and ended is not None:
-        return started <= ended
+    if started is None or ended is None:
+        return False
+    return started <= ended
+
+
+def _is_hesitation_cutoff(turn: dict) -> bool:
+    """The transcript trails off without a terminal punctuation mark —
+    catches AssemblyAI's silence-timeout turn-taking cutting a founder off
+    mid-thought, which _is_barge_in cannot see: confirmed against a real
+    session (hesitation_session.json) that the agent's reply always starts
+    several hundred ms to ~1.5s after the last detected speech, timeout or
+    not — the delay ranges for a genuine cutoff and a normal, un-interrupted
+    reply overlap almost exactly (see TESTING.md), so elapsed time alone
+    can't tell them apart. Text completeness is the signal that does.
+
+    Risk: this depends on the ASR's punctuation being reliable. A short,
+    naturally unpunctuated answer ("Yes", "No") could in principle read as
+    a false-positive hesitation cutoff. Not observed in any fixture so far
+    (every genuinely complete turn across all fixtures ends in . ? or !),
+    but worth watching for as more real calls come in.
+    """
     transcript = (turn.get("user_transcript") or "").strip()
     return bool(transcript) and transcript[-1] not in ".?!"
 
 
+def _interruption_type(turn: dict) -> Optional[str]:
+    """"barge_in", "hesitation_cutoff", or None — two distinct mechanisms
+    the investor persona can cut the founder off with, kept separate so the
+    judge prompt can tell them apart (see build_judge_prompt) instead of
+    guessing a trigger from content alone."""
+    if turn.get("trigger") != "user_speech":
+        return None
+    if _is_barge_in(turn):
+        return "barge_in"
+    if _is_hesitation_cutoff(turn):
+        return "hesitation_cutoff"
+    return None
+
+
+def _is_interruption(turn: dict) -> bool:
+    return _interruption_type(turn) is not None
+
+
 def parse_timeline(timeline: dict) -> list[dict]:
-    return [{**turn, "is_interruption": _is_interruption(turn)} for turn in timeline.get("turns", [])]
+    turns = []
+    for turn in timeline.get("turns", []):
+        itype = _interruption_type(turn)
+        turns.append({**turn, "is_interruption": itype is not None, "interruption_type": itype})
+    return turns
 
 
 def interruption_turns(turns: list[dict]) -> list[dict]:
@@ -214,8 +257,10 @@ def build_judge_prompt(turns: list[dict], sentiment_results: Optional[list[dict]
     for turn in turns:
         if turn.get("user_transcript"):
             lines.append(f"[Founder]: {turn['user_transcript']}")
-        marker = f" (INTERRUPTION){_timing_note(turn)}" if turn.get("is_interruption") else ""
-        lines.append(f"[Investor{marker}]: {turn['agent_text']}")
+        if turn.get("agent_text"):
+            itype = turn.get("interruption_type")
+            marker = f" (INTERRUPTION: {itype}){_timing_note(turn)}" if itype else ""
+            lines.append(f"[Investor{marker}]: {turn['agent_text']}")
     content = f"Transcript:\n\n{chr(10).join(lines)}"
     if sentiment_results:
         content += "\n\n" + _format_sentiment_context(sentiment_results)
