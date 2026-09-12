@@ -72,7 +72,7 @@ Return ONLY valid JSON, no prose before or after, matching exactly this shape:
   "suggestions": ["<actionable suggestion>", "..."]
 }
 
-If there were no interruptions in the transcript, base the scores on how clearly the founder communicated overall, return an empty "interruptions" list, and still give 1-3 specific suggestions grounded in what was actually said."""
+If there were no interruptions in the transcript, base the scores on how clearly the founder communicated overall, return an empty "interruptions" list, and still give 1-3 specific suggestions grounded in what was actually said. In that case, keep the category notes' language neutral — say "after being asked a direct question" or similar, not "interrupted" or "cut off" — since claiming an interruption in prose while the schema says there were none is confusing."""
 
 
 # --- session + timeline ------------------------------------------------------
