@@ -191,19 +191,24 @@ function listPersonas() {
 }
 listPersonas()
 
+function pickSurprisePersona() {
+  // Excludes the current pick so back-to-back rolls don't (as often) land
+  // on the same persona — with only one real persona configured (legacy
+  // AGENT=<name> mode) there's nothing to exclude, so fall back to the
+  // full list.
+  const candidates = PERSONAS.filter((p) => p.key !== selectedPersona?.key)
+  const pool = candidates.length ? candidates : PERSONAS
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
 $('persona').onchange = () => {
   const value = $('persona').value
   if (value === 'surprise') {
-    // One-shot: resolves immediately to a real persona and reveals it by
-    // snapping the dropdown to that name, rather than staying on
-    // "Surprise me" as a hidden, persisted choice. Picking it again rerolls.
-    // Excludes the current persona: a "surprise" that lands back on what
-    // was already selected leaves the dropdown showing the same label,
-    // which reads as "nothing happened" — confirmed live (~1/4 of rolls).
-    const candidates = PERSONAS.filter((p) => p.key !== selectedPersona.key)
-    const pool = candidates.length ? candidates : PERSONAS
-    selectedPersona = pool[Math.floor(Math.random() * pool.length)]
-    $('persona').value = selectedPersona.key
+    // Deliberately does NOT snap the dropdown to the chosen name — it
+    // stays on "Surprise me" so the identity isn't revealed there. The
+    // only reveal is the transcript label once the agent actually speaks.
+    // Each call gets its own fresh roll — see start().
+    selectedPersona = pickSurprisePersona()
   } else {
     selectedPersona = PERSONAS.find((p) => p.key === value) || PERSONAS[0]
   }
@@ -220,6 +225,15 @@ $('log-toggle').onclick = () => {
 // --- side pane tabs ---
 function loadAgentTab() {
   $('agent-body').replaceChildren()
+  if ($('persona').value === 'surprise') {
+    // Don't leak who it picked through this side channel — same reveal
+    // rule as the dropdown itself.
+    const hidden = document.createElement('div')
+    hidden.className = 'empty'
+    hidden.textContent = "Hidden — you picked Surprise me. It'll reveal itself once the call starts."
+    $('agent-body').append(hidden)
+    return
+  }
   const loading = document.createElement('div')
   loading.className = 'empty'
   loading.textContent = 'Loading the published agent.'
@@ -258,6 +272,10 @@ async function addWorklet(ctx, code, name) {
 }
 
 async function start() {
+  // Fresh roll per call so leaving the picker on "Surprise me" across
+  // multiple calls doesn't quietly reuse the same hidden persona.
+  if ($('persona').value === 'surprise') selectedPersona = pickSurprisePersona()
+
   $('btn').disabled = true
   $('mic').disabled = true
   $('persona').disabled = true
