@@ -197,7 +197,12 @@ $('persona').onchange = () => {
     // One-shot: resolves immediately to a real persona and reveals it by
     // snapping the dropdown to that name, rather than staying on
     // "Surprise me" as a hidden, persisted choice. Picking it again rerolls.
-    selectedPersona = PERSONAS[Math.floor(Math.random() * PERSONAS.length)]
+    // Excludes the current persona: a "surprise" that lands back on what
+    // was already selected leaves the dropdown showing the same label,
+    // which reads as "nothing happened" — confirmed live (~1/4 of rolls).
+    const candidates = PERSONAS.filter((p) => p.key !== selectedPersona.key)
+    const pool = candidates.length ? candidates : PERSONAS
+    selectedPersona = pool[Math.floor(Math.random() * pool.length)]
     $('persona').value = selectedPersona.key
   } else {
     selectedPersona = PERSONAS.find((p) => p.key === value) || PERSONAS[0]
@@ -209,7 +214,7 @@ $('persona').onchange = () => {
 $('btn').onclick = () => (ws?.readyState <= 1 ? stop() : start())
 $('log-toggle').onclick = () => {
   const hidden = document.body.classList.toggle('no-side')
-  $('log-toggle').textContent = hidden ? 'Show' : 'Hide'
+  $('log-toggle').textContent = hidden ? 'Show events' : 'Hide events'
 }
 
 // --- side pane tabs ---

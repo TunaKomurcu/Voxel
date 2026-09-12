@@ -202,6 +202,7 @@
   <header>
     <h1>Voxel</h1>
     <select id="persona" aria-label="Counterpart persona"></select>
+    <button class="ghost" id="log-toggle">Hide events</button>
     <span class="status idle" id="status"><span id="status-text">idle</span></span>
     <span class="meter"><span id="elapsed">0:00</span><span id="cost">$0.000</span></span>
   </header>
@@ -223,7 +224,6 @@
           <button class="ghost tab on" id="tab-events">Events</button>
           <button class="ghost tab" id="tab-agent">Agent</button>
         </span>
-        <button class="ghost" id="log-toggle">Hide</button>
       </div>
       <div class="pane-body" id="events-body">
         <div class="empty">Every websocket frame, both directions. Repeats collapse into a count.</div>
