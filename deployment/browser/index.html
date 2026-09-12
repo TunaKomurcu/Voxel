@@ -191,6 +191,10 @@
 
   .suggestions { padding-left: 20px; display: flex; flex-direction: column;
                  gap: 6px; font-size: 14px; color: var(--text); }
+
+  /* Progress history, read from localStorage. */
+  .chart-wrap { position: relative; height: 240px; max-width: 100%; }
+  .progress-note { margin-top: 10px; font-size: 12px; color: var(--text-faint); }
 </style>
 </head>
 <body>
@@ -241,8 +245,24 @@
       <div id="results-body"></div>
     </div>
   </section>
+
+  <section class="pane" id="progress">
+    <div class="pane-head">
+      <span>Progress</span>
+      <select id="progress-filter" aria-label="Filter by persona"></select>
+    </div>
+    <div class="pane-body">
+      <div id="progress-empty" class="empty">No past sessions yet — feedback from each call is saved here automatically.</div>
+      <div class="chart-wrap"><canvas id="progress-chart" hidden></canvas></div>
+      <p class="progress-note" id="progress-note" hidden>Stored only in this browser — not sent anywhere.</p>
+    </div>
+    <div class="pane-foot">
+      <button class="ghost" id="progress-clear">Clear history</button>
+    </div>
+  </section>
 </main>
 <script>window.PERSONAS = {{PERSONAS_JSON}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

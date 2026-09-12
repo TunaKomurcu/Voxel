@@ -47,7 +47,7 @@ def main() -> None:
     if path.exists() and not os.environ.get("OVERWRITE"):
         sys.exit(f"agents/{slug}.jsonc already exists. Set AGENT=<other-name> or OVERWRITE=1.")
 
-    path.write_text(HEADER.format(id=agent_id) + json.dumps(body, indent=2) + "\n")
+    path.write_text(HEADER.format(id=agent_id) + json.dumps(body, indent=2) + "\n", encoding="utf-8")
     key = agent_id_key(slug)
     saved = save_env(key, agent_id)
 

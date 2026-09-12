@@ -173,7 +173,7 @@ def main() -> None:
         for p in RESOLVED_PERSONAS:
             print(f"Persona: {p['label']} -> {p['id']}")
 
-    PAGE = ((HERE / "index.html").read_text()
+    PAGE = ((HERE / "index.html").read_text(encoding="utf-8")
             .replace("{{PERSONAS_JSON}}", json.dumps(RESOLVED_PERSONAS).replace("<", "\\u003c")))
 
     # PORT when set, otherwise 3000 and up until one is free.

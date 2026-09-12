@@ -397,7 +397,11 @@ async function start() {
         case 'session.ended':
           logEvent('down', msg.type)
           ws.close()
-          if (sessionId) fetchJudgeResults(sessionId)
+          // Captured now, not read later from selectedPersona: the call is
+          // over and the persona picker is unlocked again well before the
+          // judge pass (15-45s) finishes, so the user could switch personas
+          // while waiting for these results.
+          if (sessionId) fetchJudgeResults(sessionId, selectedPersona)
           break
 
         case 'session.error':
@@ -617,6 +621,7 @@ const LOADING_STAGES = [
 ]
 let loadingTimers = []
 let lastSessionId = null
+let lastPersona = null
 
 function startLoadingStages() {
   clearLoadingStages()
@@ -636,8 +641,9 @@ function hideResults() {
   $('results').hidden = true
 }
 
-function fetchJudgeResults(id) {
+function fetchJudgeResults(id, persona) {
   lastSessionId = id
+  lastPersona = persona
   $('results').hidden = false
   $('results-body').replaceChildren()
   $('results-error').hidden = true
@@ -650,6 +656,8 @@ function fetchJudgeResults(id) {
       clearLoadingStages()
       $('results-loading').hidden = true
       renderJudgeResults(data)
+      saveToHistory(data, persona)
+      renderProgress()
     })
     .catch(() => {
       clearLoadingStages()
@@ -658,7 +666,7 @@ function fetchJudgeResults(id) {
     })
 }
 
-$('results-retry').onclick = () => { if (lastSessionId) fetchJudgeResults(lastSessionId) }
+$('results-retry').onclick = () => { if (lastSessionId) fetchJudgeResults(lastSessionId, lastPersona) }
 
 const QUALITY_CLASS = { strong: 'quality-good', weak: 'quality-warn', poor: 'quality-bad' }
 
@@ -756,3 +764,131 @@ function renderJudgeResults(data) {
   }
   root.append(suggestions)
 }
+
+// --- progress history (localStorage, per-browser, never sent anywhere) ---
+const HISTORY_KEY = 'voxel_history'
+let progressChart = null
+
+function loadHistory() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
+    return Array.isArray(raw) ? raw : []
+  } catch {
+    return []
+  }
+}
+
+function saveToHistory(data, persona) {
+  const history = loadHistory()
+  history.push({
+    timestamp: new Date().toISOString(),
+    persona: persona?.short_name || persona?.name || 'Unknown',
+    overall_score: data.overall_score,
+    categories: {
+      content_substance: data.categories.content_substance.score,
+      composure_under_pressure: data.categories.composure_under_pressure.score,
+      audience_responsiveness: data.categories.audience_responsiveness.score,
+    },
+  })
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+  } catch (err) {
+    // Private browsing, quota exceeded, storage disabled — the call's own
+    // feedback still rendered fine, so this is a silent best-effort only.
+    console.warn('Could not save progress history:', err)
+  }
+}
+
+function cssVar(name, fallback) {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
+function personaOptions(history) {
+  const seen = []
+  for (const entry of history) {
+    if (!seen.includes(entry.persona)) seen.push(entry.persona)
+  }
+  return seen
+}
+
+function renderProgress() {
+  const history = loadHistory()
+  const filterSelect = $('progress-filter')
+  const currentFilter = filterSelect.value
+  const personas = personaOptions(history)
+
+  filterSelect.replaceChildren()
+  const allOption = document.createElement('option')
+  allOption.value = ''
+  allOption.textContent = 'All personas'
+  filterSelect.append(allOption)
+  personas.forEach((name) => {
+    const option = document.createElement('option')
+    option.value = name
+    option.textContent = name
+    filterSelect.append(option)
+  })
+  if (personas.includes(currentFilter)) filterSelect.value = currentFilter
+
+  const filtered = filterSelect.value ? history.filter((h) => h.persona === filterSelect.value) : history
+
+  if (filtered.length === 0) {
+    $('progress-empty').hidden = false
+    $('progress-chart').hidden = true
+    $('progress-note').hidden = true
+    if (progressChart) {
+      progressChart.destroy()
+      progressChart = null
+    }
+    return
+  }
+
+  $('progress-empty').hidden = true
+  $('progress-chart').hidden = false
+  $('progress-note').hidden = false
+
+  const labels = filtered.map((h) =>
+    new Date(h.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  )
+  const scores = filtered.map((h) => h.overall_score)
+
+  if (progressChart) progressChart.destroy()
+  const accent = cssVar('--cobolt-500', '#3923c7')
+  const textColor = cssVar('--text-muted', '#777673')
+  const gridColor = cssVar('--border', '#dad7cb')
+  progressChart = new Chart($('progress-chart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Overall score',
+        data: scores,
+        borderColor: accent,
+        backgroundColor: accent,
+        pointRadius: 4,
+        tension: 0.2,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { min: 0, max: 100, ticks: { color: textColor }, grid: { color: gridColor } },
+        x: { ticks: { color: textColor }, grid: { color: gridColor } },
+      },
+      plugins: { legend: { display: false } },
+    },
+  })
+}
+
+$('progress-filter').onchange = renderProgress
+$('progress-clear').onclick = () => {
+  if (confirm('Clear all saved progress history? This cannot be undone.')) {
+    localStorage.removeItem(HISTORY_KEY)
+    renderProgress()
+  }
+}
+
+// Shows saved history immediately on page load, even before any call this session.
+renderProgress()

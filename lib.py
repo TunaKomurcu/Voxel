@@ -28,7 +28,7 @@ def load_env(path: Path = ENV_FILE) -> None:
     the environment wins, so hosting platforms and shell overrides take
     precedence over the file."""
     try:
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
     except OSError:
         return
     for line in text.splitlines():
@@ -48,7 +48,7 @@ def save_env(key: str, value: str, path: Path = ENV_FILE) -> bool:
     platforms have no writable .env, so failure is reported, not fatal."""
     os.environ[key] = value
     try:
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
     except OSError:
         text = ""
     line = f"{key}={value}"
@@ -60,7 +60,7 @@ def save_env(key: str, value: str, path: Path = ENV_FILE) -> bool:
             text += "\n"
         text += line + "\n"
     try:
-        path.write_text(text)
+        path.write_text(text, encoding="utf-8")
         return True
     except OSError:
         return False
@@ -162,7 +162,7 @@ def read_agent(name: str) -> dict:
     # needs can live beside it in agents/<name>.env, gitignored the same way.
     load_env(AGENT_DIR / f"{name}.env")
     missing: set = set()
-    agent = _interpolate(parse_jsonc(path.read_text()), missing)
+    agent = _interpolate(parse_jsonc(path.read_text(encoding="utf-8")), missing)
     if missing:
         names = ", ".join(sorted(missing))
         sys.exit(f"agents/{name}.jsonc needs {names}. Add "
