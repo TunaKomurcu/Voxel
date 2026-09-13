@@ -96,6 +96,41 @@ Current fixture set (grows as new edge cases turn up in manual testing):
   complete turn across all four fixtures ends in `. ? !`), but worth
   watching for as more real calls come in — see the docstring on
   `_is_hesitation_cutoff` in `judge.py`.
+- `priya_test_session.json` — a real Priya (technical co-founder) call where
+  the founder made four separate unsupported claims in a row ("fully
+  automated", "scales with us", "200 freelancers... working well", "AI
+  handles everything end to end") before Priya asked a single combined
+  follow-up at the end. Found `min_silence`/`max_silence` aren't hard
+  thresholds in practice — pauses of 900-1400ms between claims exceeded
+  `max_silence: 800` every time without triggering a reply, suggesting the
+  turn-taking model weighs semantic completeness too (`"type": null` in
+  the config — likely AssemblyAI's adaptive mode). Also surfaced that the
+  category-note prose said "after being interrupted" while
+  `interruptions: []` — schema and prose disagreeing. Led to two fixes:
+  Priya's prompt now interrupts on the *first* unsupported claim (see
+  `priya_test_session_2.json`), and `JUDGE_SYSTEM_PROMPT` now requires
+  neutral language ("after being asked a direct question") when
+  `interruptions` is empty.
+- `priya_test_session_2.json` — same scenario, re-recorded after the
+  above prompt fix. Behaviorally better: Priya now replies after each
+  single claim-laden utterance instead of letting four pile up, and both
+  replies target the specific claim just made ("fully automated" →
+  mechanism question; "handles everything end to end" → dispute-handling
+  question). **But `parse_timeline` still finds zero interruptions here**
+  — same as before the fix. Neither reply is a `barge_in` (both start
+  ~1-1.6s *after* `user_speech_ended_at_ms`, ample processing latency, not
+  overlap) or a `hesitation_cutoff` (both user turns end in `.`, not
+  trailing off) by our definitions. The real, confirmed improvement is in
+  how many user turns pile up before Priya replies (four vs. one), not in
+  reply latency or transcript completeness — a dimension neither
+  `interruption_type` nor the judge currently measures. Also surfaced that
+  `composure_under_pressure` scored 80 here despite the founder giving
+  little real content (`content_substance: 10`, `audience_responsiveness:
+  20`) — the judge was treating "never interrupted" as "never under
+  pressure," ignoring how pointed Priya's non-interrupting questions were.
+  Fixed via a `JUDGE_SYSTEM_PROMPT` rule (no new `interruption_type`
+  needed): re-run scored `composure_under_pressure` at 30, consistent with
+  the other two categories. See PLAN.md's Phase 4b note, now closed.
 
 What to check when reading the log:
 - Does the score vary wildly between runs on the same fixture (bad — prompt

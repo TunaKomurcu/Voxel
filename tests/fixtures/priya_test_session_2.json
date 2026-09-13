@@ -1,0 +1,59 @@
+{
+  "session_id": "sess_6bc642b24d774ff8a87c8c0cfa2736a6",
+  "started_at_unix_ms": 1789323137154,
+  "turns": [
+    {
+      "turn_id": "resp_d7582e0213c04e0397f72a194d20bece",
+      "item_id": "msg_fec4aba827734488bfa4839c48a55402",
+      "status": "completed",
+      "trigger": "greeting",
+      "requested_instructions": null,
+      "user_transcript": null,
+      "user_speech_started_at_ms": null,
+      "user_speech_ended_at_ms": null,
+      "user_confidence": null,
+      "agent_text": "Alright, walk me through it — what are you building, and how does it actually work under the hood?",
+      "agent_reply_started_at_ms": 1789323137538,
+      "agent_reply_ended_at_ms": 1789323142271,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 358
+    },
+    {
+      "turn_id": "resp_77a726279a454b9d8d8e53ffc5624ae6",
+      "item_id": "msg_03711747cbbf4f39ad3da03638f1c16b",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "So we are building a platform that matches freelancers with clients using AI. Basically, the system looks at the client's project and automatically finds the best freelancer for it. It's fully automated.",
+      "user_speech_started_at_ms": 1789323144073,
+      "user_speech_ended_at_ms": 1789323156073,
+      "user_confidence": 1.0,
+      "agent_text": "What is the specific mechanism that maps the project requirements to the freelancer profiles?",
+      "agent_reply_started_at_ms": 1789323157713,
+      "agent_reply_ended_at_ms": 1789323162925,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 1637
+    },
+    {
+      "turn_id": "resp_291f89611e97482faf69cb7bc1657759",
+      "item_id": "msg_cdd5ce480d3b4aada123bededdffade8",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "So as we grow, the matching just scales with us, and we have got about 200 freelancers on the platform right now, and it's working really well. The AI handles everything end to end, so we don't really need to worry about operations as we scale to thousands of users.",
+      "user_speech_started_at_ms": 1789323166172,
+      "user_speech_ended_at_ms": 1789323181473,
+      "user_confidence": 1.0,
+      "agent_text": "How exactly does the AI handle the end to end process of resolving disputes or managing project delivery?",
+      "agent_reply_started_at_ms": 1789323182503,
+      "agent_reply_ended_at_ms": 1789323189155,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 8825
+    }
+  ],
+  "ended": {
+    "reason": "participant_disconnected",
+    "public_reason": "client_end",
+    "duration_seconds": 56.83323779296875
+  }
+}

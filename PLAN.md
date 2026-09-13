@@ -179,6 +179,30 @@ persona and turn-detection tuning.
       confirm the interruption tuning feels intentional (see PLAN.md's
       "quick manual test after every agents/*.jsonc change" rule) and that
       judge feedback tracks the right thing for that counterpart.
+      Priya: done, twice (`priya_test_session.json`,
+      `priya_test_session_2.json`) — Grace and Derek still untested.
+- [x] Known limitation, now closed: `is_interruption`/`interruption_type`
+      only catches `barge_in` (talks over the user) and `hesitation_cutoff`
+      (user trails off). A third real pattern showed up testing Priya's
+      "interrupt on the first unsupported claim" fix: the agent replying
+      promptly (~1-1.6s, ample processing latency, not overlap) and
+      pointedly to a claim the user *just finished* a complete sentence on.
+      That's not a barge-in or a hesitation cutoff by our definitions, so
+      it's invisible to `parse_timeline` — `interruptions: []` even when the
+      persona is doing exactly what its prompt asks. Confirmed by comparing
+      `priya_test_session.json` (4 unsupported claims piled up before one
+      reply) against `priya_test_session_2.json` (reply after each single
+      claim, same low reply latency in both). Rather than adding a fourth
+      `interruption_type` to detect this at the timeline layer, closed it
+      one level up: `JUDGE_SYSTEM_PROMPT` now tells the judge that an empty
+      `interruptions` list doesn't mean the founder faced no pressure —
+      `composure_under_pressure` should instead track how sharp/specific
+      the counterpart's questions were and how concrete vs. superficial the
+      founder's answers were, interruption or not. Verified on
+      `priya_test_session_2.json`: `composure_under_pressure` went from an
+      inconsistent 80 (alongside `content_substance: 10`,
+      `audience_responsiveness: 20`) to 30, now consistent with the other
+      two categories (20/15 on re-run). No new `interruption_type` needed.
 
 ## Phase 5 — Demo & submission (Days 18–20)
 - [ ] Record a 2–3 min demo video: show an interruption happening live, then
