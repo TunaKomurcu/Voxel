@@ -36,7 +36,12 @@
     :root {
       --page-bg: #17161a;
       --surface: #201f24;
-      --surface-alt: #2a282f;
+      /* Lightened from #2a282f — the two were only 1.12:1 apart, so pane
+         headers/footers barely separated from pane bodies. #302e36 keeps
+         --text-muted comfortably above 4.5:1 on it (4.60:1) while widening
+         the gap to 1.22:1; the border-bottom below does the rest of the
+         separation work. */
+      --surface-alt: #302e36;
       --border: #3a383f;
       --border-strong: #4c4a52;
       --text: #cfccc5;
@@ -122,6 +127,11 @@
   .pane-head { display: flex; align-items: center; justify-content: space-between;
                gap: 16px; padding: 10px 16px; background: var(--surface-alt);
                border-bottom: 1px solid var(--border); color: var(--text-muted); }
+  /* Same mono/uppercase/tracked language as the EVENTS/AGENT tab buttons
+     (see button's base rule below) — a title should read as a label, not
+     as another line of body text at the same size and weight. */
+  .pane-title { font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+                letter-spacing: 1.2px; text-transform: uppercase; }
   .pane-body { flex: 1; overflow-y: auto; padding: 16px; }
   .empty { color: var(--text-faint); font-size: 14px; line-height: 1.4; }
 
@@ -180,7 +190,7 @@
      .panes for flex height (see the min-height comment on body above). */
   .intro { font-size: 13px; line-height: 1.5; color: var(--text-muted);
            background: var(--surface-alt); border: 1px solid var(--border);
-           border-radius: var(--radius-lg); padding: 12px 16px; }
+           border-radius: var(--radius-lg); padding: 16px; }
   .intro p + p { margin-top: 6px; }
   .intro strong { color: var(--text-dark); font-weight: 600; }
 
@@ -242,7 +252,7 @@
 
   <div class="panes">
     <section class="pane">
-      <div class="pane-head"><span>Transcript</span></div>
+      <div class="pane-head"><span class="pane-title">Transcript</span></div>
       <div class="pane-body" id="transcript">
         <div class="empty">Start the call and talk. Partial transcripts appear as they stream, and tool calls show up inline.</div>
       </div>
@@ -268,7 +278,7 @@
   </div>
 
   <section class="pane" id="results" hidden>
-    <div class="pane-head"><span>Feedback</span></div>
+    <div class="pane-head"><span class="pane-title">Feedback</span></div>
     <div class="pane-body">
       <div id="results-loading"><span id="results-status">Reviewing what you said...</span></div>
       <div id="results-error" hidden>
@@ -281,7 +291,7 @@
 
   <section class="pane" id="progress">
     <div class="pane-head">
-      <span>Progress</span>
+      <span class="pane-title">Progress</span>
       <select id="progress-filter" aria-label="Filter by persona"></select>
     </div>
     <div class="pane-body">
