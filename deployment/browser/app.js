@@ -242,9 +242,23 @@ function loadAgentTab() {
     .then((res) => res.json())
     .then((agent) => {
       $('agent-body').replaceChildren()
+      // system_prompt is a multi-line string, so JSON.stringify-ing it
+      // inline would show literal \n escapes instead of real line breaks.
+      // Render it separately, as plain text, so it reads the way it was
+      // written.
+      const { system_prompt, ...rest } = agent
       const pre = document.createElement('pre')
-      pre.textContent = JSON.stringify(agent, null, 2)
+      pre.textContent = JSON.stringify(rest, null, 2)
       $('agent-body').append(pre)
+      if (system_prompt) {
+        const label = document.createElement('div')
+        label.className = 'empty'
+        label.style.margin = '16px 0 4px'
+        label.textContent = 'system_prompt:'
+        const promptPre = document.createElement('pre')
+        promptPre.textContent = system_prompt
+        $('agent-body').append(label, promptPre)
+      }
     })
     .catch(() => {
       $('agent-body').textContent = 'Could not load the agent.'

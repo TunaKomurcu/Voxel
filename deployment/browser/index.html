@@ -42,14 +42,23 @@
       --text: #cfccc5;
       --text-dark: #f3f1ec;
       --text-muted: #9a978f;
-      --text-faint: #706d68;
-      --cobolt-500: #8a7cf0;
-      --cobolt-300: #a89cf7;
+      /* Lightened from #706d68 (3.18:1 on --surface, fails WCAG AA) to
+         #8c8984 (4.70:1) — still clearly a step below --text-muted. */
+      --text-faint: #8c8984;
+      /* Darkened from the original pastel dark-mode accents (#8a7cf0 /
+         #a89cf7 / #ff7a6e / #ffa198) — those gave white button text only
+         2-3.4:1 contrast, below WCAG AA's 4.5:1 for normal text. Hover
+         variants go DARKER than their base here, the opposite of the
+         light-theme direction: lightening an already-near-threshold color
+         on hover would drop contrast below 4.5:1 again, so darkening is
+         what keeps hover both legible and visibly different from rest. */
+      --cobolt-500: #6654eb;
+      --cobolt-300: #4a34e8;
       --cobolt-100: #332f5c;
       --green-500: #3ddc84;
       --amber-600: #f5a623;
-      --error: #ff7a6e;
-      --error-hover: #ffa198;
+      --error: #d91200;
+      --error-hover: #b50f00;
     }
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -100,6 +109,11 @@
   @media (max-width: 880px) {
     .panes { grid-template-columns: 1fr; grid-template-rows: 1fr 176px; }
     body.no-side .panes { grid-template-rows: 1fr; }
+    /* The persona select is the one control that must never truncate its
+       selected label, so it gets its own full-width row below the title/
+       status row instead of shrinking in place. */
+    header { flex-wrap: wrap; row-gap: 10px; }
+    #persona { order: 5; flex: 1 1 100%; }
   }
 
   .pane { display: flex; flex-direction: column; min-height: 0;
