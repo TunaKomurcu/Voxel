@@ -132,6 +132,26 @@
      as another line of body text at the same size and weight. */
   .pane-title { font-family: var(--font-mono); font-size: 12px; font-weight: 600;
                 letter-spacing: 1.2px; text-transform: uppercase; }
+
+  /* Status-driven, not audio-driven: JS only toggles .user/.agent based on
+     which websocket events are currently between started/done, the bars
+     themselves know nothing about actual audio levels. */
+  .waveform { display: flex; align-items: flex-end; gap: 3px; height: 14px; }
+  .waveform span { width: 3px; height: 100%; border-radius: 2px;
+                    background: var(--border-strong); transform: scaleY(0.3);
+                    transform-origin: bottom; transition: background-color .2s; }
+  .waveform.user span, .waveform.agent span { animation: waveform-pulse 0.9s ease-in-out infinite; }
+  .waveform.user span { background: var(--green-500); }
+  .waveform.agent span { background: var(--cobolt-500); }
+  .waveform span:nth-child(1) { animation-delay: 0s; }
+  .waveform span:nth-child(2) { animation-delay: .15s; }
+  .waveform span:nth-child(3) { animation-delay: .3s; }
+  .waveform span:nth-child(4) { animation-delay: .15s; }
+  .waveform span:nth-child(5) { animation-delay: 0s; }
+  @keyframes waveform-pulse { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+  @media (prefers-reduced-motion: reduce) {
+    .waveform span { animation: none !important; }
+  }
   .pane-body { flex: 1; overflow-y: auto; padding: 16px; }
   .empty { color: var(--text-faint); font-size: 14px; line-height: 1.4; }
 
@@ -252,7 +272,12 @@
 
   <div class="panes">
     <section class="pane">
-      <div class="pane-head"><span class="pane-title">Transcript</span></div>
+      <div class="pane-head">
+        <span class="pane-title">Transcript</span>
+        <div class="waveform" id="waveform" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
       <div class="pane-body" id="transcript">
         <div class="empty">Start the call and talk. Partial transcripts appear as they stream, and tool calls show up inline.</div>
       </div>

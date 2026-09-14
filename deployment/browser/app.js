@@ -372,11 +372,13 @@ async function start() {
           // Barge-in: empty the ring buffer so the agent stops mid-word.
           playback?.port.postMessage('stop')
           setStatus('listening')
+          setWaveform('user')
           logEvent('down', msg.type)
           break
 
         case 'reply.started':
           setStatus('speaking')
+          setWaveform('agent')
           logEvent('down', msg.type)
           break
 
@@ -391,6 +393,7 @@ async function start() {
 
         case 'reply.done':
           setStatus('listening')
+          setWaveform(null)
           if (msg.status === 'interrupted') playback?.port.postMessage('stop')
           logEvent('down', msg.type, msg.status)
           break
@@ -483,6 +486,7 @@ function reset() {
   clearPartials()
   open.forEach((run) => paint(run, true))
   open.clear()
+  setWaveform(null)
   $('btn').disabled = false
   $('mic').disabled = false
   $('persona').disabled = false
@@ -493,6 +497,12 @@ function reset() {
 function setStatus(state, detail) {
   $('status').className = 'status ' + state
   $('status-text').textContent = detail || state
+}
+
+// Purely a visual cue for which side of the conversation is active right
+// now — driven by websocket event boundaries, not real audio levels.
+function setWaveform(state) {
+  $('waveform').className = 'waveform' + (state ? ' ' + state : '')
 }
 
 // $4.50 an hour, the list price at assemblyai.com/pricing. Billing is per
