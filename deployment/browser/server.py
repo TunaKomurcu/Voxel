@@ -17,7 +17,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1]))
 
-from lib import (ApiError, aai, load_env, publish_agent, read_agent,  # noqa: E402
+from lib import (ApiError, _agents_api, aai, load_env, publish_agent, read_agent,  # noqa: E402
                  required, stored_agent_id)
 import judge  # noqa: E402
 
@@ -114,6 +114,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/token":
             try:
                 token = aai("/token?product=voice_agent&expires_in_seconds=60")
+                # The browser connects the call's websocket directly to
+                # AssemblyAI, not through this server, so it needs the same
+                # region-pinned host our own REST calls use (AGENTS_API_BASE)
+                # — otherwise it can geo-route to a host that doesn't have
+                # the agent, a real agent_not_found hit in production.
+                token["ws_base"] = _agents_api().replace("https://", "wss://", 1)
                 self._send(200, json.dumps(token).encode(), "application/json")
             except ApiError as err:
                 print(err)

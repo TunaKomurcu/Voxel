@@ -290,7 +290,7 @@ async function start() {
       reset()
       return
     }
-    const { token } = await res.json()
+    const { token, ws_base } = await res.json()
 
     // Two contexts, created in the click handler so Safari starts them.
     captureCtx = new AudioContext({ sampleRate: WIRE_RATE })
@@ -315,7 +315,7 @@ async function start() {
     const capture = await addWorklet(captureCtx, CAPTURE_WORKLET, 'capture')
     captureCtx.createMediaStreamSource(mic).connect(capture)
 
-    const url = new URL('wss://agents.assemblyai.com/v1/ws')
+    const url = new URL((ws_base || 'wss://agents.assemblyai.com/v1') + '/ws')
     url.searchParams.set('token', token)
     ws = new WebSocket(url)
     let ready = false
