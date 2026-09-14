@@ -24,3 +24,10 @@ services:
         sync: false
       - key: AGENT_ID_IMPATIENT_BUYER
         sync: false
+      # Not a secret, so a literal value (not sync:false). Without this, the
+      # generic host geo-routes by the requester's location, which put these
+      # agents in a different region than Render's own requests resolved to
+      # — a real 404 "agent_not_found" hit in production despite a correct
+      # key and id. See lib.py's _agents_api() / AGENTS_API_BASE.
+      - key: AGENTS_API_BASE
+        value: https://agents.us.assemblyai.com/v1
