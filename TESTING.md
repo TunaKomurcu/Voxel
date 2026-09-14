@@ -131,6 +131,49 @@ Current fixture set (grows as new edge cases turn up in manual testing):
   Fixed via a `JUDGE_SYSTEM_PROMPT` rule (no new `interruption_type`
   needed): re-run scored `composure_under_pressure` at 30, consistent with
   the other two categories. See PLAN.md's Phase 4b note, now closed.
+- `grace_test_session.json` — a real Grace (non-technical buyer) call where
+  the founder answered every plain-English request with more jargon
+  ("multi-tenant CI/CD architecture", "event-driven pipelines",
+  "proprietary machine learning-based recommendation engine"), and Grace's
+  confusion visibly escalates each turn ("Can you say that without the
+  buzzwords?" → "I still don't understand that." → "Can you just tell me
+  what the software actually does?"). Same pattern as
+  `priya_test_session_2.json`: `parse_timeline` finds **zero**
+  interruptions (every reply arrives 630-1700ms after
+  `user_speech_ended_at_ms`, and every user turn ends in `.`, so neither
+  `barge_in` nor `hesitation_cutoff` fires), which makes this a direct test
+  of the `composure_under_pressure` fix above with a different persona.
+  Result: all three categories scored low and consistent (5/10/5) with
+  `interruptions: []` — the fix generalizes past Priya. Notes correctly
+  stayed in Grace's frame (jargon/plain-language), not investor or
+  mechanism-depth language.
+- `derek_test_session.json` — a real Derek (impatient buyer) call where the
+  founder retreated to "vision" and "long-term value" instead of answering
+  Derek's repeated, sharpening demand for a concrete cost/time number.
+  Same zero-interruption pattern as above (replies 815-1590ms after
+  `user_speech_ended_at_ms`, all user turns end in `.`). Result: all three
+  categories scored low and consistent (10/20/10) with `interruptions: []`,
+  notes correctly framed around missing ROI/cost numbers rather than
+  investor-pitch or jargon language. Confirms the `composure_under_pressure`
+  fix isn't Priya- or jargon-specific — it holds for a cost-focused
+  counterpart too.
+
+Both `grace_test_session.json` and `derek_test_session.json` also close out
+PLAN.md's Phase 4b manual-test checklist item (Priya was already tested
+twice; these were the last two of the three new personas). One caveat found
+comparing the two: `turn_detection`'s `min_silence`/`max_silence`
+(Grace: 550/900ms, Derek: 320/720ms) tune how long a *mid-utterance* pause
+has to last before the agent treats the user as done talking — they don't
+directly control reply latency once a turn is complete, and every user turn
+in both fixtures was a complete, punctuated sentence with no internal
+pause to test that setting against. Reply latencies came out similar
+across both personas (Grace avg ~1130ms, Derek avg ~1150ms) despite the
+different settings, which is expected given what the setting actually
+gates — but it means these two fixtures don't yet give direct timeline
+evidence that Grace "waits longer" or Derek "jumps in faster" the way their
+personas intend. That would need a call with an actual mid-sentence pause
+from the founder, the same gap `hesitation_session.json` exists to probe
+for Marcus.
 
 What to check when reading the log:
 - Does the score vary wildly between runs on the same fixture (bad — prompt

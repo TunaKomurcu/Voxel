@@ -1,0 +1,75 @@
+{
+  "session_id": "sess_7b120b3dae0d4c7fbf1ee09f446412f6",
+  "started_at_unix_ms": 1789386694872,
+  "turns": [
+    {
+      "turn_id": "resp_f1a5ca4c2c394616bf28dbb73fb708cd",
+      "item_id": "msg_628b6c0609ba49279f0abee51d3ccdc2",
+      "status": "completed",
+      "trigger": "greeting",
+      "requested_instructions": null,
+      "user_transcript": null,
+      "user_speech_started_at_ms": null,
+      "user_speech_ended_at_ms": null,
+      "user_confidence": null,
+      "agent_text": "I've got five minutes. What does this get me, and what's it going to cost?",
+      "agent_reply_started_at_ms": 1789386695253,
+      "agent_reply_ended_at_ms": 1789386699346,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 357
+    },
+    {
+      "turn_id": "resp_328e6ccd954245a49f95d103c16990f8",
+      "item_id": "msg_6046551e727541149d68e462b6e948dc",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "So let me tell you about our vision.",
+      "user_speech_started_at_ms": 1789386702786,
+      "user_speech_ended_at_ms": 1789386705186,
+      "user_confidence": 1.0,
+      "agent_text": "Cut the vision. How much time or money does this actually save my team?",
+      "agent_reply_started_at_ms": 1789386706772,
+      "agent_reply_ended_at_ms": 1789386711343,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 1583
+    },
+    {
+      "turn_id": "resp_3ae8c883a3fa407b94adfa4496d9e91c",
+      "item_id": "msg_7a6a138632344963bf8c4c6490ba90f4",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "Well, it's really about creating long-term value for everyone involved.",
+      "user_speech_started_at_ms": 1789386715587,
+      "user_speech_ended_at_ms": 1789386720387,
+      "user_confidence": 1.0,
+      "agent_text": "Stop talking about value in the abstract. Give me a concrete number on how much this reduces my operational overhead.",
+      "agent_reply_started_at_ms": 1789386721202,
+      "agent_reply_ended_at_ms": 1789386727854,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 812
+    },
+    {
+      "turn_id": "resp_39be8f8253234a13ac6324ba1287971f",
+      "item_id": "msg_11db53f0d604417a9ee3b98875cc3f10",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "We think in 5 years this is going to be the standard way every company operates, and we put a lot of thoughts into long-term roadmap.",
+      "user_speech_started_at_ms": 1789386729986,
+      "user_speech_ended_at_ms": 1789386738387,
+      "user_confidence": 1.0,
+      "agent_text": "I do not care about five years from now. How much can I cut from my budget by using this next quarter?",
+      "agent_reply_started_at_ms": 1789386739445,
+      "agent_reply_ended_at_ms": 1789386744817,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 1055
+    }
+  ],
+  "ended": {
+    "reason": "user_initiated",
+    "public_reason": "client_end",
+    "duration_seconds": 53.76810913085937
+  }
+}

@@ -175,12 +175,21 @@ persona and turn-detection tuning.
       Priya, plain language for Grace, ROI/cost/timeline for Derek) instead
       of investor-pitch assumptions. Trigger enum unchanged — already
       general enough.
-- [ ] Manually test at least one call with each of the three new personas;
+- [x] Manually test at least one call with each of the three new personas;
       confirm the interruption tuning feels intentional (see PLAN.md's
       "quick manual test after every agents/*.jsonc change" rule) and that
       judge feedback tracks the right thing for that counterpart.
       Priya: done, twice (`priya_test_session.json`,
-      `priya_test_session_2.json`) — Grace and Derek still untested.
+      `priya_test_session_2.json`). Grace: done
+      (`grace_test_session.json`) — escalating jargon-confusion turns,
+      judge notes correctly framed around plain language. Derek: done
+      (`derek_test_session.json`) — escalating impatience over a missing
+      cost/time number, judge notes correctly framed around ROI/cost. Both
+      also confirmed the `composure_under_pressure` fix (see below) holds
+      outside Priya's technical-cofounder persona: zero interruptions in
+      both, yet all three category scores came out low and consistent
+      (Grace 5/10/5, Derek 10/20/10) instead of the old high-composure
+      false positive.
 - [x] Known limitation, now closed: `is_interruption`/`interruption_type`
       only catches `barge_in` (talks over the user) and `hesitation_cutoff`
       (user trails off). A third real pattern showed up testing Priya's

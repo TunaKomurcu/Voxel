@@ -1,0 +1,91 @@
+{
+  "session_id": "sess_1fb7547674ca4d5cbace6a1de7555729",
+  "started_at_unix_ms": 1789386391657,
+  "turns": [
+    {
+      "turn_id": "resp_c57d1f54048e4d97adc903e4aa9e3751",
+      "item_id": "msg_98a3a378d5d742679216ad077b50a96d",
+      "status": "completed",
+      "trigger": "greeting",
+      "requested_instructions": null,
+      "user_transcript": null,
+      "user_speech_started_at_ms": null,
+      "user_speech_ended_at_ms": null,
+      "user_confidence": null,
+      "agent_text": "Okay, I've got a few minutes. Tell me what this does for my team — in plain English, please.",
+      "agent_reply_started_at_ms": 1789386392051,
+      "agent_reply_ended_at_ms": 1789386397743,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 371
+    },
+    {
+      "turn_id": "resp_3378aef7d8f8491080c1b2590fd3e1bd",
+      "item_id": "msg_6589ed6810504739bcdab70df688ad35",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "So our platform leverages a multi-tenant CI/CD architecture with real-time synchronous API orchestration across a microservice backend.",
+      "user_speech_started_at_ms": 1789386400470,
+      "user_speech_ended_at_ms": 1789386410070,
+      "user_confidence": 1.0,
+      "agent_text": "Can you say that without the buzzwords?",
+      "agent_reply_started_at_ms": 1789386411766,
+      "agent_reply_ended_at_ms": 1789386413778,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 1693
+    },
+    {
+      "turn_id": "resp_a0c06f6c4dac469884ba2f341e5eb629",
+      "item_id": "msg_5b2792f3c5a541d985fe58c122e39074",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "Sorry, basically we streamline your team's workflow through automated orchestration.",
+      "user_speech_started_at_ms": 1789386416368,
+      "user_speech_ended_at_ms": 1789386421271,
+      "user_confidence": 1.0,
+      "agent_text": "That's a little better, but what does that actually look like in my office? Is this a tool my developers use, or is it something for my managers to track progress?",
+      "agent_reply_started_at_ms": 1789386421901,
+      "agent_reply_ended_at_ms": 1789386430875,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 627
+    },
+    {
+      "turn_id": "resp_dde7cbe390c041d78110ab49ff4216e0",
+      "item_id": "msg_4cc59570e6e34b1987f4779ead0fd333",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "So we use event-driven pipelines to enable seamless cross-functional workflow automation.",
+      "user_speech_started_at_ms": 1789386433567,
+      "user_speech_ended_at_ms": 1789386438569,
+      "user_confidence": 1.0,
+      "agent_text": "I still don't understand that.",
+      "agent_reply_started_at_ms": 1789386439798,
+      "agent_reply_ended_at_ms": 1789386441569,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 1226
+    },
+    {
+      "turn_id": "resp_8d626f3c8bee42e6b857ab68efa227bb",
+      "item_id": "msg_4c4189b4d5c340e49e85af56d18f4d7d",
+      "status": "completed",
+      "trigger": "user_speech",
+      "requested_instructions": null,
+      "user_transcript": "And our proprietary machine learning-based recommendation engine drives end-to-end operational efficiency for enterprise stakeholders.",
+      "user_speech_started_at_ms": 1789386442768,
+      "user_speech_ended_at_ms": 1789386449872,
+      "user_confidence": 1.0,
+      "agent_text": "Can you just tell me what the software actually does?",
+      "agent_reply_started_at_ms": 1789386450841,
+      "agent_reply_ended_at_ms": 1789386453412,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 966
+    }
+  ],
+  "ended": {
+    "reason": "participant_disconnected",
+    "public_reason": "client_end",
+    "duration_seconds": 66.462921875
+  }
+}
