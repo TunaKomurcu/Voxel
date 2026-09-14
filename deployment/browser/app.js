@@ -886,8 +886,10 @@ function renderProgress() {
   $('progress-chart').hidden = false
   $('progress-note').hidden = false
 
+  // Fixed locale, not the system's — a demo machine set to a different
+  // language shouldn't change what the chart's x-axis reads.
   const labels = filtered.map((h) =>
-    new Date(h.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    new Date(h.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
   )
   const scores = filtered.map((h) => h.overall_score)
 
