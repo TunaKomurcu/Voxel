@@ -682,9 +682,10 @@ function fetchJudgeResults(id, persona) {
       saveToHistory(data, persona)
       renderProgress()
     })
-    .catch(() => {
+    .catch((err) => {
       clearLoadingStages()
       $('results-loading').hidden = true
+      $('results-error-message').textContent = err.message || 'Could not generate feedback for this call.'
       $('results-error').hidden = false
     })
 }

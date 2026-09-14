@@ -364,11 +364,42 @@ def _sanitize_all_examples(data: dict, allowed_numbers: set[str]) -> dict:
     return sanitized
 
 
+class RateLimitedError(Exception):
+    """Raised once the gateway is still answering 429 after every retry.
+    Kept separate from the ValueError-based JSON-format retry loop so the
+    two concerns (malformed output vs. transient rate limiting) can't get
+    tangled into one retry count."""
+
+    def __init__(self, message: str = "Service is busy, please try again in a moment."):
+        super().__init__(message)
+
+
+_MAX_RATE_LIMIT_ATTEMPTS = 3
+_RATE_LIMIT_BACKOFF_SECONDS = [5, 15]  # wait before attempt 2, then before attempt 3
+
+
+def _llm_gateway_chat_with_retry(model: str, messages: list[dict], max_tokens: int) -> dict:
+    """Wraps lib.llm_gateway_chat with backoff retry on 429 specifically —
+    other ApiErrors (bad request, auth, 5xx) aren't transient in the same
+    way and propagate immediately."""
+    last_error: Optional[lib.ApiError] = None
+    for attempt in range(_MAX_RATE_LIMIT_ATTEMPTS):
+        try:
+            return lib.llm_gateway_chat(model=model, messages=messages, max_tokens=max_tokens)
+        except lib.ApiError as err:
+            if err.status != 429:
+                raise
+            last_error = err
+            if attempt < _MAX_RATE_LIMIT_ATTEMPTS - 1:
+                time.sleep(_RATE_LIMIT_BACKOFF_SECONDS[attempt])
+    raise RateLimitedError() from last_error
+
+
 def _request_judge_json(messages: list[dict], model: str) -> dict:
     """One gateway round-trip: send messages, parse, validate. Raises
     ValueError (json.JSONDecodeError is a ValueError subclass) on either
     failure, for the retry loop in call_judge to catch."""
-    response = lib.llm_gateway_chat(model=model, messages=messages, max_tokens=1500)
+    response = _llm_gateway_chat_with_retry(model, messages, max_tokens=1500)
     content = response["choices"][0]["message"]["content"]
     data = json.loads(_strip_code_fence(content))
     validate_judge_output(data)

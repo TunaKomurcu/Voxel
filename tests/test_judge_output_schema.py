@@ -2,10 +2,11 @@ import copy
 import json
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import judge
+import lib
 import pytest
 
 VALID = {
@@ -267,3 +268,39 @@ def test_sanitize_interruption_count_keeps_first_n():
 def test_sanitize_interruption_count_to_zero():
     sanitized = judge._sanitize_interruption_count(VALID, marked_count=0)
     assert sanitized["interruptions"] == []
+
+
+# --- 429 rate-limit retry -------------------------------------------------------
+#
+# Deliberately separate from the JSON-format retry tests above: a 429 is a
+# transport-level ApiError, not a ValueError, so it must not be caught (or
+# counted) by the JSON retry loop in call_judge.
+
+
+def _rate_limited(status: int = 429) -> lib.ApiError:
+    return lib.ApiError("POST /chat/completions", status, "rate limited")
+
+
+def test_rate_limit_retries_then_succeeds():
+    responses = [_rate_limited(), _rate_limited(), _response(json.dumps(VALID))]
+    with patch("lib.llm_gateway_chat", side_effect=responses) as mocked, \
+            patch("judge.time.sleep") as mocked_sleep:
+        result = judge.call_judge(TURNS_WITH_MATCHING_NUMBERS)
+    assert result == VALID
+    assert mocked.call_count == 3
+    mocked_sleep.assert_has_calls([call(5), call(15)])
+
+
+def test_rate_limit_gives_up_after_max_attempts():
+    with patch("lib.llm_gateway_chat", side_effect=[_rate_limited(), _rate_limited(), _rate_limited()]) as mocked, \
+            patch("judge.time.sleep"):
+        with pytest.raises(judge.RateLimitedError, match="busy"):
+            judge.call_judge(TURNS_WITH_MATCHING_NUMBERS)
+    assert mocked.call_count == 3
+
+
+def test_non_429_api_error_is_not_retried():
+    with patch("lib.llm_gateway_chat", side_effect=_rate_limited(status=500)) as mocked:
+        with pytest.raises(lib.ApiError):
+            judge.call_judge(TURNS_WITH_MATCHING_NUMBERS)
+    mocked.assert_called_once()

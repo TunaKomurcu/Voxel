@@ -102,6 +102,10 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 result = judge.run_judge_pass(session_id)
                 self._send(200, json.dumps(result).encode(), "application/json")
+            except judge.RateLimitedError as err:
+                print(f"Judge pass rate-limited for {session_id}: {err}")
+                body = json.dumps({"error": str(err)}).encode()
+                self._send(503, body, "application/json")
             except Exception as err:
                 print(f"Judge pass failed for {session_id}: {err}")
                 body = json.dumps({"error": "Could not generate feedback for this call."}).encode()

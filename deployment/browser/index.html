@@ -162,6 +162,14 @@
                     line-height: 1.6; color: var(--text); white-space: pre-wrap;
                     word-break: break-word; }
 
+  /* Short product blurb, above the call panes so it never competes with
+     .panes for flex height (see the min-height comment on body above). */
+  .intro { font-size: 13px; line-height: 1.5; color: var(--text-muted);
+           background: var(--surface-alt); border: 1px solid var(--border);
+           border-radius: var(--radius-lg); padding: 12px 16px; }
+  .intro p + p { margin-top: 6px; }
+  .intro strong { color: var(--text-dark); font-weight: 600; }
+
   /* Post-call feedback. */
   #results-loading { color: var(--text-muted); font-size: 14px; }
   #results-error p { margin-bottom: 12px; color: var(--error); }
@@ -213,6 +221,11 @@
     <span class="meter"><span id="elapsed">0:00</span><span id="cost">$0.000</span></span>
   </header>
 
+  <div class="intro">
+    <p><strong>Voxel</strong> is a pitch-practice coach. A skeptical AI persona interrupts your pitch at weak points — then gives you objective, structured feedback on how well you recovered.</p>
+    <p>Powered by AssemblyAI's Voice Agent API for real-time conversation, plus a second, independent analysis pass using session data and sentiment analysis.</p>
+  </div>
+
   <div class="panes">
     <section class="pane">
       <div class="pane-head"><span>Transcript</span></div>
@@ -245,7 +258,7 @@
     <div class="pane-body">
       <div id="results-loading"><span id="results-status">Reviewing what you said...</span></div>
       <div id="results-error" hidden>
-        <p>Could not generate feedback for this call.</p>
+        <p id="results-error-message">Could not generate feedback for this call.</p>
         <button id="results-retry">Try again</button>
       </div>
       <div id="results-body"></div>
