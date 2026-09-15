@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light dark">
 <title>Voxel</title>
+<!-- Small gradient orb, matching the app's own centerpiece orb (cobolt to
+     green) — recognizable as a plain dot even at 16px tab size. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='g' cx='35%25' cy='30%25' r='75%25'%3E%3Cstop offset='0%25' stop-color='%236654eb'/%3E%3Cstop offset='100%25' stop-color='%2301762f'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='15' fill='url(%23g)'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- Headings and the score number only (see --font-display below) — body
@@ -42,6 +45,10 @@
     --error-hover: #f4695f;
     --radius-sm: 4px;
     --radius-lg: 12px;
+    /* Resting elevation for .pane/.intro — a tight contact shadow plus a
+       soft ambient one, warm-neutral (not pure black) to sit right on the
+       cream page background. */
+    --shadow-pane: 0 1px 2px rgba(29, 27, 22, .05), 0 6px 20px rgba(29, 27, 22, .06);
     --font-display: "Sora", "Oceanic Text", Georgia, serif;
     --font-body: "UN 11ST", system-ui, -apple-system, sans-serif;
     --font-mono: "Modern Gothic Mono", "JetBrains Mono", ui-monospace, monospace;
@@ -81,6 +88,11 @@
       --amber-600: #f5a623;
       --error: #d91200;
       --error-hover: #b50f00;
+      /* Softer/lower-opacity than light mode — a dark shadow on an
+         already-dark page barely lifts anything, so this leans on the
+         existing 1px border for most of the separation and only adds a
+         faint ambient falloff. */
+      --shadow-pane: 0 1px 2px rgba(0, 0, 0, .35), 0 6px 20px rgba(0, 0, 0, .18);
     }
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -193,7 +205,8 @@
 
   .pane { display: flex; flex-direction: column; min-height: 0;
           background: var(--surface); border: 1px solid var(--border);
-          border-radius: var(--radius-lg); overflow: hidden; }
+          border-radius: var(--radius-lg); overflow: hidden;
+          box-shadow: var(--shadow-pane); }
   .pane-head { display: flex; align-items: center; justify-content: space-between;
                gap: 16px; padding: 10px 16px; background: var(--surface-alt);
                border-bottom: 1px solid var(--border); color: var(--text-muted); }
@@ -288,6 +301,19 @@
 
   .pane-body { flex: 1; overflow-y: auto; padding: 16px; }
   .empty { color: var(--text-faint); font-size: 14px; line-height: 1.4; }
+  /* Shared stroke-icon convention (also used on the action buttons below) —
+     one size, one stroke weight, color inherited via currentColor so each
+     icon automatically matches whatever text color its button/state has. */
+  .icon { width: 14px; height: 14px; flex-shrink: 0; fill: none; stroke: currentColor;
+          stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  /* Progress panel's empty state only — Transcript/Events keep the plain
+     one-line .empty treatment above, this one's a mini "nothing here yet"
+     card since it's the panel most likely to read as broken/unfinished
+     when blank. */
+  #progress-empty { display: flex; flex-direction: column; align-items: center;
+                     gap: 10px; text-align: center; padding: 28px 16px;
+                     color: var(--text-muted); }
+  #progress-empty .empty-icon { width: 28px; height: 28px; color: var(--text-faint); }
 
   #transcript { display: flex; flex-direction: column; gap: 12px; }
   .line { display: flex; gap: 12px; font-size: 16px; line-height: 1.4; }
@@ -318,7 +344,7 @@
            border-radius: var(--radius-sm); background: var(--cobolt-500);
            color: #fff; font-family: var(--font-mono); font-size: 14px;
            letter-spacing: 1.4px; text-transform: uppercase; white-space: nowrap;
-           cursor: pointer;
+           cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
            transition: background-color .2s, transform .15s ease-out, box-shadow .15s ease-out; }
   button:hover:not(:disabled) { background: var(--cobolt-300); }
   /* Scoped off .ghost — those read as text links, not buttons, so they keep
@@ -338,7 +364,7 @@
      click-ripple. The ripple is a real pseudo-element since it's meant to
      sit visibly on top of the label for that instant, positioned via JS
      custom properties set at the click point. */
-  #btn { position: relative; overflow: hidden;
+  #btn { position: relative; overflow: hidden; flex-shrink: 0;
          background-image: linear-gradient(115deg, transparent 30%,
            rgba(255, 255, 255, .35) 45%, rgba(255, 255, 255, .35) 55%, transparent 70%);
          background-size: 220% 100%; background-repeat: no-repeat;
@@ -394,7 +420,8 @@
      .panes for flex height (see the min-height comment on body above). */
   .intro { font-size: 13px; line-height: 1.5; color: var(--text-muted);
            background: var(--surface-alt); border: 1px solid var(--border);
-           border-radius: var(--radius-lg); padding: 16px; }
+           border-radius: var(--radius-lg); padding: 16px;
+           box-shadow: var(--shadow-pane); }
   .intro p + p { margin-top: 6px; }
   .intro strong { color: var(--text-dark); font-weight: 600; }
 
@@ -500,7 +527,10 @@
       <select id="persona" aria-label="Counterpart persona"></select>
       <span id="persona-hint" class="persona-hint"></span>
     </div>
-    <button class="ghost" id="log-toggle">Hide events</button>
+    <button class="ghost" id="log-toggle">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span id="log-toggle-label">Hide events</span>
+    </button>
     <span class="status idle" id="status"><span id="status-text">idle</span></span>
     <span class="meter"><span id="elapsed">0:00</span><span id="cost">$0.000</span></span>
   </header>
@@ -534,7 +564,10 @@
       </div>
       <div class="pane-foot">
         <select id="mic" aria-label="Microphone"><option value="">Default microphone</option></select>
-        <button id="btn">Start call</button>
+        <button id="btn">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4M8 22h8"/></svg>
+          <span id="btn-label">Start call</span>
+        </button>
       </div>
     </section>
     <section class="pane" id="side">
@@ -556,13 +589,19 @@
   <section class="pane" id="results" hidden>
     <div class="pane-head">
       <span class="pane-title">Feedback</span>
-      <button class="ghost" id="results-copy" hidden>Copy feedback</button>
+      <button class="ghost" id="results-copy" hidden>
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span id="results-copy-label">Copy feedback</span>
+      </button>
     </div>
     <div class="pane-body">
       <div id="results-loading"><span id="results-status">Reviewing what you said...</span></div>
       <div id="results-error" hidden>
         <p id="results-error-message">Could not generate feedback for this call.</p>
-        <button id="results-retry">Try again</button>
+        <button id="results-retry">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+          Try again
+        </button>
       </div>
       <div id="results-body"></div>
     </div>
@@ -574,14 +613,22 @@
       <select id="progress-filter" aria-label="Filter by persona"></select>
     </div>
     <div class="pane-body">
-      <div id="progress-empty" class="empty">No past sessions yet — feedback from each call is saved here automatically.</div>
+      <div id="progress-empty" class="empty">
+        <svg class="icon empty-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 20V13M10 20V5M16 20V10M22 20V16"/>
+        </svg>
+        No past sessions yet — feedback from each call is saved here automatically.
+      </div>
       <div class="chart-wrap"><canvas id="progress-chart" hidden></canvas></div>
       <div class="progress-best" id="progress-best" hidden></div>
       <div class="progress-detail" id="progress-detail" hidden></div>
       <p class="progress-note" id="progress-note" hidden>Stored only in this browser — not sent anywhere.</p>
     </div>
     <div class="pane-foot">
-      <button class="ghost" id="progress-clear">Clear history</button>
+      <button class="ghost" id="progress-clear">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16z"/></svg>
+        Clear history
+      </button>
     </div>
   </section>
 </main>

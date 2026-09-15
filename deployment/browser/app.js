@@ -246,7 +246,7 @@ $('persona').onchange = () => {
 $('btn').onclick = () => (ws?.readyState <= 1 ? stop() : start())
 $('log-toggle').onclick = () => {
   const hidden = document.body.classList.toggle('no-side')
-  $('log-toggle').textContent = hidden ? 'Show events' : 'Hide events'
+  $('log-toggle-label').textContent = hidden ? 'Show events' : 'Hide events'
 }
 
 // --- side pane tabs ---
@@ -390,7 +390,7 @@ async function start() {
           tick()
           setStatus('listening')
           $('btn').disabled = false
-          $('btn').textContent = 'End call'
+          $('btn-label').textContent = 'End call'
           $('btn').classList.add('live')
           logEvent('down', msg.type, msg.session_id)
           break
@@ -517,7 +517,7 @@ function reset() {
   $('btn').disabled = false
   $('mic').disabled = false
   $('persona').disabled = false
-  $('btn').textContent = 'Start call'
+  $('btn-label').textContent = 'Start call'
   $('btn').classList.remove('live')
 }
 
@@ -784,10 +784,10 @@ $('results-copy').onclick = () => {
   if (!lastResultsData) return
   const text = formatFeedbackText(lastResultsData, lastPersona)
   navigator.clipboard.writeText(text).then(() => {
-    const btn = $('results-copy')
-    const original = btn.textContent
-    btn.textContent = 'Copied!'
-    setTimeout(() => { btn.textContent = original }, 1500)
+    const label = $('results-copy-label')
+    const original = label.textContent
+    label.textContent = 'Copied!'
+    setTimeout(() => { label.textContent = original }, 1500)
   })
 }
 
