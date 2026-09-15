@@ -534,6 +534,19 @@ function setWaveform(state) {
   $('orb').className = 'orb' + cls
 }
 
+// Purely a visual click-ripple on the call button — positions the CSS
+// ripple at the exact click point via custom properties. Runs alongside
+// $('btn').onclick above, no effect on the actual start/stop logic.
+$('btn').addEventListener('click', e => {
+  const el = e.currentTarget
+  const rect = el.getBoundingClientRect()
+  el.style.setProperty('--ripple-x', (e.clientX - rect.left) + 'px')
+  el.style.setProperty('--ripple-y', (e.clientY - rect.top) + 'px')
+  el.classList.remove('rippling')
+  void el.offsetWidth
+  el.classList.add('rippling')
+})
+
 // $4.50 an hour, the list price at assemblyai.com/pricing. Billing is per
 // session minute, so the running figure is an estimate, not an invoice.
 const COST_PER_SECOND = 4.5 / 3600

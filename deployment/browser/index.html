@@ -140,6 +140,26 @@
   h1 { font-family: var(--font-display); font-size: 24px; font-weight: 400;
        letter-spacing: -1.2px; line-height: 1; color: var(--text-dark);
        margin-right: auto; }
+  /* Progressive enhancement: solid --text-dark above is the fallback for
+     any browser without background-clip:text support — the gradient
+     rules only take over where that's actually available, so the title
+     is never left transparent-with-nothing-showing-through. */
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    h1 {
+      background: linear-gradient(90deg, var(--cobolt-500), var(--green-500), var(--cobolt-500));
+      background-size: 200% auto;
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+      animation: h1-gradient-shift 9s linear infinite;
+    }
+  }
+  @keyframes h1-gradient-shift {
+    0% { background-position: 0% 50%; }
+    100% { background-position: -200% 50%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    h1 { animation: none !important; }
+  }
   .status { display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
   .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%;
                     background: currentColor; flex-shrink: 0; }
@@ -210,21 +230,38 @@
      by the transcript-rendering code (addLine/partial/clearEmpty) and
      naturally scrolls out of view once a real conversation fills the pane. */
   .orb-wrap { display: flex; justify-content: center; padding: 4px 0 28px; }
-  .orb { width: 116px; height: 116px; border-radius: 50%;
+  .orb { position: relative; width: 116px; height: 116px; border-radius: 50%;
          background: radial-gradient(circle at 32% 28%, var(--border-strong), var(--orb-idle-edge) 80%);
          box-shadow: 0 0 0 0 transparent;
          transition: background .6s ease, box-shadow .6s ease;
          animation: orb-breathe 5s ease-in-out infinite; }
   .orb.user { background: radial-gradient(circle at 32% 28%, var(--green-500), var(--green-500) 80%);
-              box-shadow: 0 0 44px 10px var(--green-glow);
+              box-shadow: 0 0 44px 10px var(--green-glow), 0 0 90px 30px var(--green-glow);
               animation: orb-pulse 1s ease-in-out infinite; }
   .orb.agent { background: radial-gradient(circle at 32% 28%, var(--cobolt-300), var(--cobolt-500) 80%);
-               box-shadow: 0 0 44px 10px var(--cobolt-glow);
+               box-shadow: 0 0 44px 10px var(--cobolt-glow), 0 0 90px 30px var(--cobolt-glow);
                animation: orb-pulse .85s ease-in-out infinite; }
   @keyframes orb-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
   @keyframes orb-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+  /* Speaking-only ripple rings — invisible/static at idle. Each is the
+     orb's own size (inset:0) and scales outward from there, so they
+     always ripple from the orb's actual edge regardless of its own
+     breathe/pulse scale. */
+  .orb-ring { position: absolute; inset: 0; border-radius: 50%;
+              border: 2px solid transparent; opacity: 0; pointer-events: none; }
+  .orb.user .orb-ring, .orb.agent .orb-ring { animation: orb-ripple 1.8s ease-out infinite; }
+  .orb.user .orb-ring { border-color: var(--green-500); }
+  .orb.agent .orb-ring { border-color: var(--cobolt-500); }
+  .orb-ring:nth-child(1) { animation-delay: 0s; }
+  .orb-ring:nth-child(2) { animation-delay: .5s; }
+  .orb-ring:nth-child(3) { animation-delay: 1s; }
+  @keyframes orb-ripple {
+    0% { transform: scale(1); opacity: .6; }
+    100% { transform: scale(2.5); opacity: 0; }
+  }
   @media (prefers-reduced-motion: reduce) {
-    .orb { animation: none !important; }
+    .orb, .orb-ring { animation: none !important; }
   }
 
   /* Shared micro-transition: a panel/card's one-time entrance. Applying it
@@ -232,7 +269,10 @@
      element goes from [hidden] (display:none) back to visible — no JS
      needed to "restart" it, the display change alone does that. */
   @keyframes fade-in-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-  #results:not([hidden]), .progress-detail:not([hidden]),
+  #results:not([hidden]) {
+    animation: fade-in-up .3s ease-out, panel-border-spin 6s linear 3;
+  }
+  .progress-detail:not([hidden]),
   #events-body:not([hidden]), #agent-body:not([hidden]) {
     animation: fade-in-up .3s ease-out;
   }
@@ -291,6 +331,37 @@
   @media (prefers-reduced-motion: reduce) {
     button:hover:not(:disabled):not(.ghost), button:active:not(:disabled):not(.ghost) { transform: none; }
   }
+
+  /* Call button only (#btn, not every button): a light sweep on hover, as
+     a background-image layer (paints behind the label text, so it never
+     needs z-index games with the "Start call"/"End call" text) — plus a
+     click-ripple. The ripple is a real pseudo-element since it's meant to
+     sit visibly on top of the label for that instant, positioned via JS
+     custom properties set at the click point. */
+  #btn { position: relative; overflow: hidden;
+         background-image: linear-gradient(115deg, transparent 30%,
+           rgba(255, 255, 255, .35) 45%, rgba(255, 255, 255, .35) 55%, transparent 70%);
+         background-size: 220% 100%; background-repeat: no-repeat;
+         background-position: 200% 0; }
+  #btn:hover:not(:disabled) { animation: btn-shimmer 2.4s ease-in-out infinite; }
+  @keyframes btn-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -120% 0; }
+  }
+  #btn::after {
+    content: ''; position: absolute; left: var(--ripple-x, 50%); top: var(--ripple-y, 50%);
+    width: 8px; height: 8px; background: rgba(255, 255, 255, .55); border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0); opacity: 0; pointer-events: none;
+  }
+  #btn.rippling::after { animation: btn-ripple .5s ease-out; }
+  @keyframes btn-ripple {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: .55; }
+    100% { transform: translate(-50%, -50%) scale(20); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #btn:hover:not(:disabled) { animation: none; }
+    #btn.rippling::after { animation: none !important; opacity: 0 !important; }
+  }
   select { flex: 0 1 220px; min-width: 0; height: 40px; padding: 0 8px;
            font-family: var(--font-body); font-size: 13px; color: var(--text-muted);
            background: var(--surface); border: 1px solid var(--border);
@@ -342,6 +413,23 @@
   /* Post-call feedback. */
   #results-loading { color: var(--text-muted); font-size: 14px; }
   #results-error p { margin-bottom: 12px; color: var(--error); }
+
+  /* "New feedback arrived" cue: a conic-gradient ring spins a few times
+     around the panel, then settles (still visible, just no longer
+     spinning — see the fixed-iteration-count animation below, not
+     infinite). Only #results gets this, not every .pane — it's meant to
+     mark a specific moment (new results in), not a standing decoration. */
+  @property --border-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+  #results {
+    border: 2px solid transparent;
+    background: linear-gradient(var(--surface), var(--surface)) padding-box,
+                conic-gradient(from var(--border-angle), var(--cobolt-500), var(--green-500), var(--cobolt-500)) border-box;
+  }
+  @keyframes panel-border-spin { to { --border-angle: 360deg; } }
 
   .score { display: flex; align-items: baseline; gap: 6px; margin-bottom: 20px; }
   .score-num { font-family: var(--font-display); font-size: 48px; font-weight: 600;
@@ -435,7 +523,13 @@
         </div>
       </div>
       <div class="pane-body" id="transcript">
-        <div class="orb-wrap"><div class="orb" id="orb" aria-hidden="true"></div></div>
+        <div class="orb-wrap">
+          <div class="orb" id="orb" aria-hidden="true">
+            <span class="orb-ring"></span>
+            <span class="orb-ring"></span>
+            <span class="orb-ring"></span>
+          </div>
+        </div>
         <div class="empty">Start the call and talk. Partial transcripts appear as they stream, and tool calls show up inline.</div>
       </div>
       <div class="pane-foot">
