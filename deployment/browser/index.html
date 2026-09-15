@@ -214,6 +214,18 @@
   .intro p + p { margin-top: 6px; }
   .intro strong { color: var(--text-dark); font-weight: 600; }
 
+  /* Same container language as .intro, collapsed by default so it doesn't
+     compete with the intro blurb for attention. */
+  .how-it-works { margin-top: 12px; background: var(--surface-alt);
+                   border: 1px solid var(--border); border-radius: var(--radius-lg);
+                   padding: 16px; }
+  .how-it-works summary { cursor: pointer; font-family: var(--font-mono);
+                           font-size: 12px; font-weight: 600; letter-spacing: 1.2px;
+                           text-transform: uppercase; color: var(--text-muted); }
+  .how-it-works summary:hover { color: var(--text-dark); }
+  .how-it-works p { margin-top: 10px; font-size: 13px; line-height: 1.5;
+                     color: var(--text-muted); }
+
   /* Post-call feedback. */
   #results-loading { color: var(--text-muted); font-size: 14px; }
   #results-error p { margin-bottom: 12px; color: var(--error); }
@@ -252,6 +264,18 @@
 
   /* Progress history, read from localStorage. */
   .chart-wrap { position: relative; height: 240px; max-width: 100%; }
+  /* Reuses .score/.categories/.category from the Feedback panel above —
+     same visual language, just no notes (history only ever stored the
+     numbers, not the judge's prose). */
+  .progress-detail { margin-top: 16px; padding: 16px; background: var(--surface-alt);
+                      border: 1px solid var(--border); border-radius: var(--radius-lg); }
+  .progress-detail-head { display: flex; align-items: baseline; justify-content: space-between;
+                           margin-bottom: 12px; }
+  .progress-detail-meta { font-size: 13px; color: var(--text-muted); }
+  .progress-detail-close { height: auto; margin-left: 0; padding: 0 4px; background: transparent;
+                            color: var(--text-faint); font-family: var(--font-body);
+                            font-size: 18px; text-transform: none; letter-spacing: 0; line-height: 1; }
+  .progress-detail-close:hover { color: var(--text-dark); background: transparent; }
   .progress-note { margin-top: 10px; font-size: 12px; color: var(--text-faint); }
 </style>
 </head>
@@ -268,6 +292,10 @@
   <div class="intro">
     <p><strong>Voxel</strong> is a pitch-practice coach. A skeptical AI persona interrupts your pitch at weak points — then gives you objective, structured feedback on how well you recovered.</p>
     <p>Powered by AssemblyAI's Voice Agent API for real-time conversation, plus a second, independent analysis pass using session data and sentiment analysis.</p>
+    <details class="how-it-works">
+      <summary>How this works</summary>
+      <p>The Voice Agent API runs the live conversation. Once the call ends, its timeline is combined with AssemblyAI's sentiment analysis and sent to a separate, independent LLM judge pass — which scores your pitch across three categories: content substance, composure under pressure, and audience responsiveness.</p>
+    </details>
   </div>
 
   <div class="panes">
@@ -322,6 +350,7 @@
     <div class="pane-body">
       <div id="progress-empty" class="empty">No past sessions yet — feedback from each call is saved here automatically.</div>
       <div class="chart-wrap"><canvas id="progress-chart" hidden></canvas></div>
+      <div class="progress-detail" id="progress-detail" hidden></div>
       <p class="progress-note" id="progress-note" hidden>Stored only in this browser — not sent anywhere.</p>
     </div>
     <div class="pane-foot">

@@ -7,6 +7,16 @@ const WIRE_RATE = 24_000
 const PERSONAS = window.PERSONAS
 let selectedPersona = PERSONAS[0]
 
+// Short "what to expect" hints, shown as tooltips on the persona picker.
+// Keyed by server.py's PERSONAS[].key.
+const PERSONA_HINTS = {
+  investor: 'Fast, aggressive — demands hard numbers.',
+  technical: 'Probes technical depth and mechanism.',
+  buyer: 'No jargon — wants plain-English clarity.',
+  enterprise: 'Impatient — wants concrete ROI, not vision.',
+  surprise: 'Random persona — revealed once the call starts.',
+}
+
 // Scratch buffers are reused: allocating on the audio thread causes glitches.
 const CAPTURE_WORKLET = `
   class CaptureProcessor extends AudioWorkletProcessor {
@@ -181,13 +191,20 @@ function listPersonas() {
     const option = document.createElement('option')
     option.value = p.key
     option.textContent = p.label || p.name
+    if (PERSONA_HINTS[p.key]) option.title = PERSONA_HINTS[p.key]
     select.append(option)
   })
   const surprise = document.createElement('option')
   surprise.value = 'surprise'
   surprise.textContent = '\u{1F3B2} Surprise me'
+  surprise.title = PERSONA_HINTS.surprise
   select.append(surprise)
   select.value = selectedPersona.key
+  // The select's own (closed-dropdown) tooltip mirrors whatever value is
+  // actually showing — never the resolved persona, so a "Surprise me"
+  // pick doesn't leak through a hover tooltip the dropdown itself doesn't
+  // reveal.
+  select.title = PERSONA_HINTS[select.value] || ''
 }
 listPersonas()
 
@@ -212,6 +229,9 @@ $('persona').onchange = () => {
   } else {
     selectedPersona = PERSONAS.find((p) => p.key === value) || PERSONAS[0]
   }
+  // Mirrors `value` (what's visibly selected), not selectedPersona — see
+  // the same note in listPersonas().
+  $('persona').title = PERSONA_HINTS[value] || ''
   // Refresh the sidebar's read-only agent view if it's the one showing.
   if (!$('agent-body').hidden) loadAgentTab()
 }
@@ -725,6 +745,18 @@ function tag(text, cls) {
   return el
 }
 
+// Counts a number up from 0 to target over duration ms — purely cosmetic,
+// the final textContent is always the real score regardless of timing.
+function animateCount(el, target, duration = 700) {
+  const start = performance.now()
+  function tick(now) {
+    const progress = Math.min((now - start) / duration, 1)
+    el.textContent = Math.round(target * progress)
+    if (progress < 1) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
+
 function renderJudgeResults(data) {
   const root = $('results-body')
   root.replaceChildren()
@@ -733,12 +765,13 @@ function renderJudgeResults(data) {
   score.className = 'score'
   const num = document.createElement('span')
   num.className = 'score-num'
-  num.textContent = data.overall_score
+  num.textContent = '0'
   const label = document.createElement('span')
   label.className = 'score-label'
   label.textContent = '/ 100'
   score.append(num, label)
   root.append(score)
+  animateCount(num, data.overall_score)
 
   const categories = document.createElement('div')
   categories.className = 'categories'
@@ -816,6 +849,11 @@ function renderJudgeResults(data) {
 // --- progress history (localStorage, per-browser, never sent anywhere) ---
 const HISTORY_KEY = 'voxel_history'
 let progressChart = null
+// The array a chart click's point index resolves against — always the
+// exact list the currently-rendered chart was built from (post-filter),
+// never the raw, unfiltered history.
+let lastFilteredHistory = []
+let openDetailIndex = null
 
 function loadHistory() {
   try {
@@ -881,6 +919,8 @@ function renderProgress() {
 
   const filtered = filterSelect.value ? history.filter((h) => h.persona === filterSelect.value) : history
 
+  hideProgressDetail()
+
   if (filtered.length === 0) {
     $('progress-empty').hidden = false
     $('progress-chart').hidden = true
@@ -892,6 +932,7 @@ function renderProgress() {
     return
   }
 
+  lastFilteredHistory = filtered
   $('progress-empty').hidden = true
   $('progress-chart').hidden = false
   $('progress-note').hidden = false
@@ -923,6 +964,15 @@ function renderProgress() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      onHover: (evt, elements) => {
+        evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'
+      },
+      onClick: (evt, elements) => {
+        if (!elements.length) return
+        const index = elements[0].index
+        if (openDetailIndex === index) hideProgressDetail()
+        else showProgressDetail(index)
+      },
       scales: {
         y: { min: 0, max: 100, ticks: { color: textColor }, grid: { color: gridColor } },
         x: { ticks: { color: textColor }, grid: { color: gridColor } },
@@ -930,6 +980,78 @@ function renderProgress() {
       plugins: { legend: { display: false } },
     },
   })
+}
+
+const CATEGORY_LABELS = {
+  content_substance: 'Content Substance',
+  composure_under_pressure: 'Composure Under Pressure',
+  audience_responsiveness: 'Audience Responsiveness',
+}
+
+function hideProgressDetail() {
+  openDetailIndex = null
+  $('progress-detail').hidden = true
+  $('progress-detail').replaceChildren()
+}
+
+function showProgressDetail(index) {
+  const entry = lastFilteredHistory[index]
+  if (!entry) return
+  openDetailIndex = index
+
+  const root = $('progress-detail')
+  root.replaceChildren()
+
+  const head = document.createElement('div')
+  head.className = 'progress-detail-head'
+  const meta = document.createElement('span')
+  meta.className = 'progress-detail-meta'
+  const when = new Date(entry.timestamp).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+  })
+  meta.textContent = `${entry.persona} — ${when}`
+  const close = document.createElement('button')
+  close.className = 'progress-detail-close'
+  close.textContent = '×'
+  close.setAttribute('aria-label', 'Close')
+  close.onclick = hideProgressDetail
+  head.append(meta, close)
+  root.append(head)
+
+  const score = document.createElement('div')
+  score.className = 'score'
+  const num = document.createElement('span')
+  num.className = 'score-num'
+  num.textContent = entry.overall_score
+  const label = document.createElement('span')
+  label.className = 'score-label'
+  label.textContent = '/ 100'
+  score.append(num, label)
+  root.append(score)
+
+  const categories = document.createElement('div')
+  categories.className = 'categories'
+  for (const [key, value] of Object.entries(entry.categories)) {
+    const row = document.createElement('div')
+    row.className = 'category'
+    const catLabel = document.createElement('div')
+    catLabel.className = 'category-label'
+    catLabel.textContent = CATEGORY_LABELS[key] || key.replace(/_/g, ' ')
+    const barWrap = document.createElement('div')
+    barWrap.className = 'bar-wrap'
+    const bar = document.createElement('div')
+    bar.className = 'bar'
+    bar.style.width = value + '%'
+    barWrap.append(bar)
+    const catScore = document.createElement('div')
+    catScore.className = 'category-score'
+    catScore.textContent = value
+    row.append(catLabel, barWrap, catScore)
+    categories.append(row)
+  }
+  root.append(categories)
+
+  root.hidden = false
 }
 
 $('progress-filter').onchange = renderProgress
