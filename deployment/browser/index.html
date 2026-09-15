@@ -40,6 +40,14 @@
        this gets its own value per theme instead of changing --surface-alt
        (used everywhere else) just for the orb. */
     --orb-idle-edge: var(--text-muted);
+    /* Ambient glow behind the orb at rest — same box-shadow mechanism as
+       the .orb.user/.orb.agent speaking glows below, just far fainter, so
+       the orb reads as "present" even when idle instead of only lighting
+       up once a call starts. */
+    --orb-idle-glow: rgba(57, 35, 199, .12);
+    /* Grain sits on cream/near-black respectively — dark needs a touch
+       more opacity to read at all against a darker ground. */
+    --grain-opacity: .025;
     --amber-600: #b45309;
     --error: #f04438;
     --error-hover: #f4695f;
@@ -85,6 +93,8 @@
       --green-500: #3ddc84;
       --green-glow: rgba(61, 220, 132, .45);
       --orb-idle-edge: var(--surface-alt);
+      --orb-idle-glow: rgba(102, 84, 235, .18);
+      --grain-opacity: .045;
       --amber-600: #f5a623;
       --error: #d91200;
       --error-hover: #b50f00;
@@ -117,6 +127,14 @@
   .atmosphere { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
   .blob { position: absolute; border-radius: 50%; filter: blur(80px);
           opacity: .28; will-change: transform; }
+  /* Static film-grain texture, tiled from a tiny seamless feTurbulence
+     SVG — breaks up the otherwise perfectly smooth gradient blobs/flat
+     background, the same trick premium marketing sites use. Static (no
+     animation), so it needs no prefers-reduced-motion handling. */
+  .grain { position: absolute; inset: 0;
+           background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+           background-size: 120px 120px; opacity: var(--grain-opacity);
+           mix-blend-mode: overlay; }
   .blob-1 { width: 480px; height: 480px; top: -12%; left: -10%;
             background: radial-gradient(circle, var(--cobolt-500), transparent 70%);
             animation: blob-float-1 28s ease-in-out infinite; }
@@ -187,8 +205,14 @@
   #elapsed { min-width: 34px; text-align: right; }
   #cost { min-width: 48px; text-align: right; }
 
+  /* minmax(0, 1fr) on the row, not the default auto: without it, a tall
+     sibling (e.g. the Agent tab's raw JSON dump) stretches the grid row
+     to fit it, and the Transcript pane — orb included — gets dragged up
+     to match even though its own content never changed. Capping the row
+     to the container's own height means each pane's already-present
+     .pane-body { overflow-y: auto } scrolls instead of the row growing. */
   .panes { flex: 1; min-height: 420px; display: grid; gap: 16px;
-           grid-template-columns: 1fr 360px; }
+           grid-template-columns: 1fr 360px; grid-template-rows: minmax(0, 1fr); }
   body.no-side .panes { grid-template-columns: 1fr; }
   body.no-side #side { display: none; }
   [hidden] { display: none !important; }
@@ -245,7 +269,7 @@
   .orb-wrap { display: flex; justify-content: center; padding: 4px 0 28px; }
   .orb { position: relative; width: 116px; height: 116px; border-radius: 50%;
          background: radial-gradient(circle at 32% 28%, var(--border-strong), var(--orb-idle-edge) 80%);
-         box-shadow: 0 0 0 0 transparent;
+         box-shadow: 0 0 36px 8px var(--orb-idle-glow);
          transition: background .6s ease, box-shadow .6s ease;
          animation: orb-breathe 5s ease-in-out infinite; }
   .orb.user { background: radial-gradient(circle at 32% 28%, var(--green-500), var(--green-500) 80%);
@@ -315,6 +339,20 @@
                      color: var(--text-muted); }
   #progress-empty .empty-icon { width: 28px; height: 28px; color: var(--text-faint); }
 
+  /* max-height, not just the inherited flex:1/overflow-y:auto from
+     .pane-body: .panes sits in a flex chain that's only min-height-bound
+     (see the body min-height comment above), so its own block size is
+     indefinite — which means grid-template-rows: minmax(0, 1fr) above has
+     no definite container size to divide and falls back to auto (content-
+     based) sizing anyway. A long Agent-tab JSON dump (or, in real use, a
+     long transcript) would then inflate this pane's own intrinsic height,
+     and since both .panes grid items share one row, the OTHER pane gets
+     dragged up to match — the reported "orb drifts" bug. Capping each
+     side's own content height directly (independent of the ancestor
+     chain) keeps both panes' intrinsic sizes bounded, so the shared grid
+     row settles on a sane height instead of ballooning; overflow-y: auto
+     (already set on .pane-body) then scrolls the excess in place. */
+  #transcript, #events-body, #agent-body { max-height: 60vh; }
   #transcript { display: flex; flex-direction: column; gap: 12px; }
   .line { display: flex; gap: 12px; font-size: 16px; line-height: 1.4; }
   .who { color: var(--text-faint); padding-top: 3px; flex-shrink: 0; width: 88px;
@@ -519,6 +557,7 @@
   <div class="blob blob-1"></div>
   <div class="blob blob-2"></div>
   <div class="blob blob-3"></div>
+  <div class="grain"></div>
 </div>
 <main>
   <header>
