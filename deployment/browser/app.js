@@ -1,6 +1,14 @@
 // The page's client. Identical to the one in the JS starter: the
 // audio worklets, the websocket session, and the transcript and event panes.
 const $ = (id) => document.getElementById(id)
+// Restarts a CSS `animation` on an element that already has the class —
+// a plain classList.add() is a no-op if the class (and so the animation)
+// is already applied, so the class has to actually come off first.
+function replayAnimation(el, cls) {
+  el.classList.remove(cls)
+  void el.offsetWidth
+  el.classList.add(cls)
+}
 // The rate the API speaks. Both worklets resample, since a browser may
 // ignore the rate an AudioContext asks for.
 const WIRE_RATE = 24_000
@@ -230,6 +238,7 @@ $('persona').onchange = () => {
   // Mirrors `value` (what's visibly selected), not selectedPersona — see
   // the same note in listPersonas().
   $('persona-hint').textContent = PERSONA_HINTS[value] || ''
+  replayAnimation($('persona-hint'), 'flash')
   // Refresh the sidebar's read-only agent view if it's the one showing.
   if (!$('agent-body').hidden) loadAgentTab()
 }
@@ -520,7 +529,9 @@ function setStatus(state, detail) {
 // Purely a visual cue for which side of the conversation is active right
 // now — driven by websocket event boundaries, not real audio levels.
 function setWaveform(state) {
-  $('waveform').className = 'waveform' + (state ? ' ' + state : '')
+  const cls = state ? ' ' + state : ''
+  $('waveform').className = 'waveform' + cls
+  $('orb').className = 'orb' + cls
 }
 
 // $4.50 an hour, the list price at assemblyai.com/pricing. Billing is per

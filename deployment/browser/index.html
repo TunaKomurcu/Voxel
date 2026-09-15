@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light dark">
 <title>Voxel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Headings and the score number only (see --font-display below) — body
+     text stays in the system stack for readability. font-display:swap
+     (via the &display=swap query param) means the fallback serif renders
+     immediately and Sora swaps in once loaded, no blocking. -->
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   /* Tokens taken from assemblyai.com. The three typefaces are licensed and
      not bundled here, so each falls back the same way the site's own stack
@@ -22,13 +29,20 @@
     --cobolt-500: #3923c7;
     --cobolt-300: #887bdd;
     --cobolt-100: #d7d3f4;
+    --cobolt-glow: rgba(57, 35, 199, .35);
     --green-500: #01762f;
+    --green-glow: rgba(1, 118, 47, .35);
+    /* The idle orb's outer gradient stop: --surface-alt itself is too close
+       to --page-bg in light mode (both pale cream) to read as a sphere, so
+       this gets its own value per theme instead of changing --surface-alt
+       (used everywhere else) just for the orb. */
+    --orb-idle-edge: var(--text-muted);
     --amber-600: #b45309;
     --error: #f04438;
     --error-hover: #f4695f;
     --radius-sm: 4px;
     --radius-lg: 12px;
-    --font-display: "Oceanic Text", Georgia, serif;
+    --font-display: "Sora", "Oceanic Text", Georgia, serif;
     --font-body: "UN 11ST", system-ui, -apple-system, sans-serif;
     --font-mono: "Modern Gothic Mono", "JetBrains Mono", ui-monospace, monospace;
   }
@@ -60,7 +74,10 @@
       --cobolt-500: #6654eb;
       --cobolt-300: #4a34e8;
       --cobolt-100: #332f5c;
+      --cobolt-glow: rgba(102, 84, 235, .45);
       --green-500: #3ddc84;
+      --green-glow: rgba(61, 220, 132, .45);
+      --orb-idle-edge: var(--surface-alt);
       --amber-600: #f5a623;
       --error: #d91200;
       --error-hover: #b50f00;
@@ -81,6 +98,38 @@
   }
   main { width: 100%; max-width: 1088px; flex: 1; display: flex;
          flex-direction: column; min-height: 0; gap: 16px; }
+
+  /* Subtle animated backdrop — sits behind body's own background paint
+     (z-index:-1 still paints above the root's background, see CSS2.1
+     Appendix E) and below all normal content, never intercepts input. */
+  .atmosphere { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(80px);
+          opacity: .28; will-change: transform; }
+  .blob-1 { width: 480px; height: 480px; top: -12%; left: -10%;
+            background: radial-gradient(circle, var(--cobolt-500), transparent 70%);
+            animation: blob-float-1 28s ease-in-out infinite; }
+  .blob-2 { width: 420px; height: 420px; top: 35%; right: -14%;
+            background: radial-gradient(circle, var(--cobolt-300), transparent 70%);
+            animation: blob-float-2 32s ease-in-out infinite; }
+  .blob-3 { width: 380px; height: 380px; bottom: -14%; left: 22%;
+            background: radial-gradient(circle, var(--green-500), transparent 70%);
+            opacity: .18;
+            animation: blob-float-3 26s ease-in-out infinite; }
+  @keyframes blob-float-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(60px, 40px) scale(1.1); }
+  }
+  @keyframes blob-float-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-55px, 35px) scale(0.94); }
+  }
+  @keyframes blob-float-3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(35px, -45px) scale(1.06); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .blob { animation: none !important; }
+  }
 
   /* .eyebrow on the site: mono, 12px, uppercase, 1.2px tracking. */
   .eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 1.2px;
@@ -153,6 +202,50 @@
   @media (prefers-reduced-motion: reduce) {
     .waveform span { animation: none !important; }
   }
+
+  /* The waveform's bigger sibling — same three states (set by the same
+     setWaveform() call, see app.js), just a centerpiece instead of a
+     corner indicator. Lives at the top of the transcript pane, ahead of
+     the .empty placeholder and any appended lines, so it's never touched
+     by the transcript-rendering code (addLine/partial/clearEmpty) and
+     naturally scrolls out of view once a real conversation fills the pane. */
+  .orb-wrap { display: flex; justify-content: center; padding: 4px 0 28px; }
+  .orb { width: 116px; height: 116px; border-radius: 50%;
+         background: radial-gradient(circle at 32% 28%, var(--border-strong), var(--orb-idle-edge) 80%);
+         box-shadow: 0 0 0 0 transparent;
+         transition: background .6s ease, box-shadow .6s ease;
+         animation: orb-breathe 5s ease-in-out infinite; }
+  .orb.user { background: radial-gradient(circle at 32% 28%, var(--green-500), var(--green-500) 80%);
+              box-shadow: 0 0 44px 10px var(--green-glow);
+              animation: orb-pulse 1s ease-in-out infinite; }
+  .orb.agent { background: radial-gradient(circle at 32% 28%, var(--cobolt-300), var(--cobolt-500) 80%);
+               box-shadow: 0 0 44px 10px var(--cobolt-glow);
+               animation: orb-pulse .85s ease-in-out infinite; }
+  @keyframes orb-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+  @keyframes orb-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+  @media (prefers-reduced-motion: reduce) {
+    .orb { animation: none !important; }
+  }
+
+  /* Shared micro-transition: a panel/card's one-time entrance. Applying it
+     via `animation` (not `transition`) means it also replays whenever an
+     element goes from [hidden] (display:none) back to visible — no JS
+     needed to "restart" it, the display change alone does that. */
+  @keyframes fade-in-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  #results:not([hidden]), .progress-detail:not([hidden]),
+  #events-body:not([hidden]), #agent-body:not([hidden]) {
+    animation: fade-in-up .3s ease-out;
+  }
+  .category, .interruption-card, .progress-best-chip, .persona-hint.flash {
+    animation: fade-in-up .25s ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #results, .progress-detail, #events-body, #agent-body,
+    .category, .interruption-card, .progress-best-chip, .persona-hint.flash {
+      animation: none !important;
+    }
+  }
+
   .pane-body { flex: 1; overflow-y: auto; padding: 16px; }
   .empty { color: var(--text-faint); font-size: 14px; line-height: 1.4; }
 
@@ -185,11 +278,19 @@
            border-radius: var(--radius-sm); background: var(--cobolt-500);
            color: #fff; font-family: var(--font-mono); font-size: 14px;
            letter-spacing: 1.4px; text-transform: uppercase; white-space: nowrap;
-           cursor: pointer; transition: background-color .2s; }
+           cursor: pointer;
+           transition: background-color .2s, transform .15s ease-out, box-shadow .15s ease-out; }
   button:hover:not(:disabled) { background: var(--cobolt-300); }
+  /* Scoped off .ghost — those read as text links, not buttons, so they keep
+     just the color change above, no lift. */
+  button:hover:not(:disabled):not(.ghost) { transform: scale(1.02); box-shadow: 0 4px 16px rgba(0, 0, 0, .2); }
+  button:active:not(:disabled):not(.ghost) { transform: scale(.98); box-shadow: none; }
   button:disabled { opacity: .55; cursor: default; }
   button.live { background: var(--error); }
   button.live:hover { background: var(--error-hover); }
+  @media (prefers-reduced-motion: reduce) {
+    button:hover:not(:disabled):not(.ghost), button:active:not(:disabled):not(.ghost) { transform: none; }
+  }
   select { flex: 0 1 220px; min-width: 0; height: 40px; padding: 0 8px;
            font-family: var(--font-body); font-size: 13px; color: var(--text-muted);
            background: var(--surface); border: 1px solid var(--border);
@@ -243,7 +344,7 @@
   #results-error p { margin-bottom: 12px; color: var(--error); }
 
   .score { display: flex; align-items: baseline; gap: 6px; margin-bottom: 20px; }
-  .score-num { font-family: var(--font-display); font-size: 48px;
+  .score-num { font-family: var(--font-display); font-size: 48px; font-weight: 600;
                color: var(--text-dark); line-height: 1; }
   .score-label { color: var(--text-faint); font-size: 14px; }
 
@@ -299,6 +400,11 @@
 </style>
 </head>
 <body>
+<div class="atmosphere" aria-hidden="true">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
 <main>
   <header>
     <h1>Voxel</h1>
@@ -329,6 +435,7 @@
         </div>
       </div>
       <div class="pane-body" id="transcript">
+        <div class="orb-wrap"><div class="orb" id="orb" aria-hidden="true"></div></div>
         <div class="empty">Start the call and talk. Partial transcripts appear as they stream, and tool calls show up inline.</div>
       </div>
       <div class="pane-foot">
