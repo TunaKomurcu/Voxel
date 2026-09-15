@@ -250,6 +250,24 @@ $('log-toggle').onclick = () => {
 }
 
 // --- side pane tabs ---
+// Purely visual: dims punctuation/structure and picks out keys, strings,
+// and literals so the raw agent JSON reads lighter without hiding any of
+// it. Escapes first so nothing in the agent's own data can inject markup.
+function highlightJSON(json) {
+  const escaped = json
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  return escaped.replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+    (match) => {
+      let cls = 'jn'
+      if (/^"/.test(match)) cls = /:$/.test(match) ? 'jk' : 'js'
+      return `<span class="${cls}">${match}</span>`
+    }
+  )
+}
+
 function loadAgentTab() {
   $('agent-body').replaceChildren()
   if ($('persona').value === 'surprise') {
@@ -275,7 +293,8 @@ function loadAgentTab() {
       // written.
       const { system_prompt, ...rest } = agent
       const pre = document.createElement('pre')
-      pre.textContent = JSON.stringify(rest, null, 2)
+      pre.className = 'json'
+      pre.innerHTML = highlightJSON(JSON.stringify(rest, null, 2))
       $('agent-body').append(pre)
       if (system_prompt) {
         const label = document.createElement('div')

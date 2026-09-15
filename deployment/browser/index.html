@@ -219,12 +219,25 @@
   @media (max-width: 880px) {
     .panes { grid-template-columns: 1fr; grid-template-rows: 1fr 176px; }
     body.no-side .panes { grid-template-rows: 1fr; }
-    /* The persona picker (select + its always-visible hint) is the one
-       control that must never truncate its selected label, so it gets its
-       own full-width row below the title/status row instead of shrinking
-       in place. */
     header { flex-wrap: wrap; row-gap: 10px; }
-    .persona-picker { order: 5; flex: 1 1 100%; }
+    /* Back to the original 116px here — the enlarged hero orb's ripple
+       scales to 2.5x its own size, and at this width the page is too
+       narrow to fit a 500px ripple (200px orb) without it visibly
+       clipping or forcing horizontal scroll. */
+    .hero .orb { width: 116px; height: 116px; }
+    .hero { gap: 16px; }
+    .hero-controls { flex-direction: column; width: 100%; max-width: 320px; }
+    .hero-pickers { flex-direction: column; align-items: stretch; width: 100%; }
+    .hero-pickers .persona-picker,
+    .hero-pickers .persona-picker select,
+    .hero-pickers select#mic { width: 100%; }
+    /* Same footgun documented on .persona-picker select above: flex's
+       basis (220px) lands on the main axis, which is vertical once
+       .hero-pickers switches to a column — without flex:none it turns
+       into a 220px-tall select instead of a 220px-wide one. */
+    .hero-pickers select#mic { flex: none; }
+    .hero-pickers .persona-hint { max-width: 100%; }
+    .hero-controls button#btn { width: 100%; margin-left: 0; }
   }
 
   .pane { display: flex; flex-direction: column; min-height: 0;
@@ -260,14 +273,21 @@
     .waveform span { animation: none !important; }
   }
 
+  /* Hero: home screen for the call, floating directly on the atmosphere
+     (no card background/border of its own, unlike .pane/.intro) so it
+     reads as a distinct, lighter "moment" rather than another panel. */
+  .hero { display: flex; flex-direction: column; align-items: center;
+          gap: 24px; padding: 12px 0 8px; }
+  .hero-controls { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .hero-pickers { display: flex; align-items: flex-end; gap: 12px; }
+  .hero-controls button#btn { margin-left: 0; height: 48px; padding: 0 32px; font-size: 15px; }
   /* The waveform's bigger sibling — same three states (set by the same
      setWaveform() call, see app.js), just a centerpiece instead of a
-     corner indicator. Lives at the top of the transcript pane, ahead of
-     the .empty placeholder and any appended lines, so it's never touched
-     by the transcript-rendering code (addLine/partial/clearEmpty) and
-     naturally scrolls out of view once a real conversation fills the pane. */
-  .orb-wrap { display: flex; justify-content: center; padding: 4px 0 28px; }
-  .orb { position: relative; width: 116px; height: 116px; border-radius: 50%;
+     corner indicator. Lives in .hero, not inside the Transcript pane, so
+     it stays a constant, always-visible status indicator instead of
+     scrolling away once transcript lines fill the pane below it. */
+  .orb-wrap { display: flex; justify-content: center; }
+  .orb { position: relative; width: 200px; height: 200px; border-radius: 50%;
          background: radial-gradient(circle at 32% 28%, var(--border-strong), var(--orb-idle-edge) 80%);
          box-shadow: 0 0 36px 8px var(--orb-idle-glow);
          transition: background .6s ease, box-shadow .6s ease;
@@ -453,12 +473,27 @@
   #agent-body pre { font-family: var(--font-mono); font-size: 12px;
                     line-height: 1.6; color: var(--text); white-space: pre-wrap;
                     word-break: break-word; }
+  /* Raw JSON only (not the system_prompt pre below, which stays at full
+     .pre contrast since it's the one part meant to be read closely) —
+     punctuation/structure dims to --text-faint, and highlightJSON() in
+     app.js picks out keys/strings/literals so the dump reads lighter
+     without hiding any of it. */
+  #agent-body pre.json { color: var(--text-faint); }
+  #agent-body pre.json .jk { color: var(--text-dark); }
+  #agent-body pre.json .js { color: var(--green-500); }
+  #agent-body pre.json .jn { color: var(--cobolt-500); }
 
   /* Short product blurb, above the call panes so it never competes with
-     .panes for flex height (see the min-height comment on body above). */
+     .panes for flex height (see the min-height comment on body above).
+     The brand-gradient top stripe is a background layer (not a border-
+     image, which ignores border-radius and would square off the rounded
+     corners) — overflow:hidden clips its sharp rectangular edges to the
+     same curve as the rest of the box. */
   .intro { font-size: 13px; line-height: 1.5; color: var(--text-muted);
-           background: var(--surface-alt); border: 1px solid var(--border);
-           border-radius: var(--radius-lg); padding: 16px;
+           background: linear-gradient(90deg, var(--cobolt-500), var(--green-500)) top / 100% 3px no-repeat,
+                       var(--surface-alt);
+           border: 1px solid var(--border);
+           border-radius: var(--radius-lg); padding: 16px; overflow: hidden;
            box-shadow: var(--shadow-pane); }
   .intro p + p { margin-top: 6px; }
   .intro strong { color: var(--text-dark); font-weight: 600; }
@@ -562,10 +597,6 @@
 <main>
   <header>
     <h1>Voxel</h1>
-    <div class="persona-picker">
-      <select id="persona" aria-label="Counterpart persona"></select>
-      <span id="persona-hint" class="persona-hint"></span>
-    </div>
     <button class="ghost" id="log-toggle">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
       <span id="log-toggle-label">Hide events</span>
@@ -573,6 +604,34 @@
     <span class="status idle" id="status"><span id="status-text">idle</span></span>
     <span class="meter"><span id="elapsed">0:00</span><span id="cost">$0.000</span></span>
   </header>
+
+  <!-- The call's home screen: orb + pickers + start button, always visible
+       regardless of call state. No idle/live transition of its own — the
+       orb's state classes (still toggled by the same setWaveform() call),
+       #btn.live, and select:disabled already carry all the state signal,
+       so there's nothing here that needs to appear/disappear. -->
+  <section class="hero">
+    <div class="orb-wrap">
+      <div class="orb" id="orb" aria-hidden="true">
+        <span class="orb-ring"></span>
+        <span class="orb-ring"></span>
+        <span class="orb-ring"></span>
+      </div>
+    </div>
+    <div class="hero-controls">
+      <div class="hero-pickers">
+        <div class="persona-picker">
+          <select id="persona" aria-label="Counterpart persona"></select>
+          <span id="persona-hint" class="persona-hint"></span>
+        </div>
+        <select id="mic" aria-label="Microphone"><option value="">Default microphone</option></select>
+      </div>
+      <button id="btn">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4M8 22h8"/></svg>
+        <span id="btn-label">Start call</span>
+      </button>
+    </div>
+  </section>
 
   <div class="intro">
     <p><strong>Voxel</strong> is a pitch-practice coach. A skeptical AI persona interrupts your pitch at weak points — then gives you objective, structured feedback on how well you recovered.</p>
@@ -592,21 +651,7 @@
         </div>
       </div>
       <div class="pane-body" id="transcript">
-        <div class="orb-wrap">
-          <div class="orb" id="orb" aria-hidden="true">
-            <span class="orb-ring"></span>
-            <span class="orb-ring"></span>
-            <span class="orb-ring"></span>
-          </div>
-        </div>
         <div class="empty">Start the call and talk. Partial transcripts appear as they stream, and tool calls show up inline.</div>
-      </div>
-      <div class="pane-foot">
-        <select id="mic" aria-label="Microphone"><option value="">Default microphone</option></select>
-        <button id="btn">
-          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><path d="M12 18v4M8 22h8"/></svg>
-          <span id="btn-label">Start call</span>
-        </button>
       </div>
     </section>
     <section class="pane" id="side">
