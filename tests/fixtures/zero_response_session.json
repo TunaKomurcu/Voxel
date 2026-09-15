@@ -1,0 +1,27 @@
+{
+  "session_id": "sess_fa8d263aa9294da8866e4e8d04a3473e",
+  "started_at_unix_ms": 1789476116804,
+  "turns": [
+    {
+      "turn_id": "resp_91fed4d304164f5ebc3992ad8522d5cc",
+      "item_id": "msg_7f5616a766d745c99c8cbf1fa43d859f",
+      "status": "completed",
+      "trigger": "greeting",
+      "requested_instructions": null,
+      "user_transcript": null,
+      "user_speech_started_at_ms": null,
+      "user_speech_ended_at_ms": null,
+      "user_confidence": null,
+      "agent_text": "Okay, I've got a few minutes. Tell me what this does for my team — in plain English, please.",
+      "agent_reply_started_at_ms": 1789476117004,
+      "agent_reply_ended_at_ms": 1789476122616,
+      "interrupted_at_ms": null,
+      "time_to_first_audio_ms": 178
+    }
+  ],
+  "ended": {
+    "reason": "user_initiated",
+    "public_reason": "client_end",
+    "duration_seconds": 10.873959228515625
+  }
+}

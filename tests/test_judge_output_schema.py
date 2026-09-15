@@ -9,6 +9,14 @@ import judge
 import lib
 import pytest
 
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+
+def load_fixture_turns(name: str) -> list[dict]:
+    timeline = json.loads((FIXTURES_DIR / name).read_text(encoding="utf-8"))
+    return judge.parse_timeline(timeline)
+
+
 VALID = {
     "overall_score": 72,
     "categories": {
@@ -33,6 +41,16 @@ VALID = {
 }
 
 GREETING_TURN = {"trigger": "greeting", "user_transcript": None, "agent_text": "Hi", "is_interruption": False}
+
+# A turn with real founder speech but no interruption — used wherever a test
+# needs "some minimal turns" without tripping the zero-response short-circuit
+# (which GREETING_TURN alone now would, since its user_transcript is None).
+NON_EMPTY_NO_INTERRUPTION_TURN = {
+    "trigger": "user_speech",
+    "user_transcript": "We help small teams manage their inventory.",
+    "agent_text": "Tell me more about how that works day to day.",
+    "is_interruption": False,
+}
 
 # VALID has exactly one interruption entry, so turns fed to call_judge in
 # tests that expect VALID back unmodified need exactly one marked turn —
@@ -103,7 +121,7 @@ def test_call_judge_raises_on_non_json_content():
     fake_response = {"choices": [{"message": {"content": "not json"}}]}
     with patch("lib.llm_gateway_chat", return_value=fake_response):
         with pytest.raises(ValueError):
-            judge.call_judge([GREETING_TURN])
+            judge.call_judge([NON_EMPTY_NO_INTERRUPTION_TURN])
 
 
 def test_call_judge_strips_markdown_code_fence():
@@ -121,7 +139,7 @@ def test_call_judge_raises_on_schema_violation():
     fake_response = {"choices": [{"message": {"content": json.dumps(broken)}}]}
     with patch("lib.llm_gateway_chat", return_value=fake_response):
         with pytest.raises(ValueError, match="0-100"):
-            judge.call_judge([GREETING_TURN])
+            judge.call_judge([NON_EMPTY_NO_INTERRUPTION_TURN])
 
 
 def _response(content: str) -> dict:
@@ -231,7 +249,7 @@ def test_interruption_count_retry_succeeds_when_nothing_is_marked():
     clean["interruptions"] = []
     responses = [_response(json.dumps(too_many)), _response(json.dumps(clean))]
     with patch("lib.llm_gateway_chat", side_effect=responses) as mocked:
-        result = judge.call_judge([GREETING_TURN])
+        result = judge.call_judge([NON_EMPTY_NO_INTERRUPTION_TURN])
     assert result["interruptions"] == []
     assert mocked.call_count == 2
 
@@ -304,3 +322,49 @@ def test_non_429_api_error_is_not_retried():
         with pytest.raises(lib.ApiError):
             judge.call_judge(TURNS_WITH_MATCHING_NUMBERS)
     mocked.assert_called_once()
+
+
+# --- zero-response short-circuit -------------------------------------------------
+#
+# A real call (sess_fa8d263aa9294da8866e4e8d04a3473e, saved as
+# zero_response_session.json) where the founder never said a word got scored
+# 95/100 by qwen3.5-4b-32k-fast, with fabricated notes describing a founder
+# response that never happened. Re-running that exact transcript found the
+# model hallucinates a fake founder turn 2 times out of 3 once sentiment
+# context is attached (0/3 without it) — the prompt's own instructions
+# already say to score near-zero here, so this isn't a wording problem the
+# prompt can reliably fix. These tests cover the deterministic fallback
+# instead: when every turn's user_transcript is empty, the LLM is never
+# called at all.
+
+
+def test_no_user_speech_true_for_zero_response_fixture():
+    turns = load_fixture_turns("zero_response_session.json")
+    assert judge._no_user_speech(turns) is True
+
+
+def test_no_user_speech_false_for_near_empty_fixture():
+    # near_empty_session.json's founder does say one word ("Alright.") —
+    # not enough content to score well, but not zero either, so this must
+    # still go through the judge (see TESTING.md for how that's covered).
+    turns = load_fixture_turns("near_empty_session.json")
+    assert judge._no_user_speech(turns) is False
+
+
+def test_call_judge_short_circuits_on_zero_response_fixture():
+    turns = load_fixture_turns("zero_response_session.json")
+    with patch("lib.llm_gateway_chat") as mocked:
+        result = judge.call_judge(turns)
+    mocked.assert_not_called()
+    assert result == judge._ZERO_RESPONSE_RESULT
+
+
+def test_zero_response_result_matches_schema():
+    judge.validate_judge_output(judge._zero_response_result())  # must not raise
+
+
+def test_zero_response_result_is_a_fresh_copy():
+    a = judge._zero_response_result()
+    b = judge._zero_response_result()
+    a["overall_score"] = 99
+    assert b["overall_score"] == 0

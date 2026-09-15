@@ -174,6 +174,34 @@ evidence that Grace "waits longer" or Derek "jumps in faster" the way their
 personas intend. That would need a call with an actual mid-sentence pause
 from the founder, the same gap `hesitation_session.json` exists to probe
 for Marcus.
+- `zero_response_session.json` — a real Grace call
+  (`sess_fa8d263aa9294da8866e4e8d04a3473e`) where the founder never said a
+  single word — the timeline has exactly one turn (the greeting), with
+  `user_transcript: null`. In production this scored **95/100** with
+  fabricated notes describing a founder response that never happened.
+  Re-running the exact same transcript found `qwen3.5-4b-32k-fast`
+  hallucinates a fake founder turn **2 times out of 3** once sentiment
+  analysis is attached to the prompt (0 times out of 3 without it) — the
+  judge prompt's own instructions already say to score near-zero for
+  little-or-no content, so this wasn't a wording gap the prompt could
+  reliably close; a low-parameter model just doesn't follow that
+  instruction once the prompt looks enough like a real back-and-forth.
+  Fixed with a deterministic short-circuit instead of a prompt tweak:
+  `judge._no_user_speech()` checks whether every turn's `user_transcript`
+  is empty, and if so `call_judge()`/`run_judge_pass()` return a fixed
+  0/100 result without ever calling the LLM (or fetching sentiment,
+  which is also skipped). A softer prompt rule was added too
+  ("never describe a founder response not explicitly in a `[Founder]`
+  line") as defense in depth for the partially-empty case this
+  short-circuit doesn't catch (see `near_empty_session.json` below) — not
+  a guarantee, since this is exactly the class of instruction the model
+  already wasn't reliably following.
+  `near_empty_session.json` (one word, "Alright.") is the boundary case:
+  `_no_user_speech()` correctly returns `False` for it — a real,
+  if minimal, founder turn exists, so it still goes to the judge.
+  Re-verified live after the prompt change: 2/2 real runs scored low
+  (10, 15) with no fabricated founder content, consistent with its
+  pre-existing behavior.
 
 What to check when reading the log:
 - Does the score vary wildly between runs on the same fixture (bad — prompt

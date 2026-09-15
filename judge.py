@@ -29,6 +29,8 @@ The user message names the specific counterpart for this call (who they are, wha
 
 Lines marked (INTERRUPTION: <type>) are moments the counterpart cut the founder off. Some carry a bracketed timing note (pre-interrupt speech rate, response latency, recovery speech rate, in words/sec and milliseconds) — treat it as one more signal about composure, not something to repeat verbatim. The transcript may be followed by a block of sentence-level sentiment analysis; match those sentences to the transcript by their text, not by position, and use them as context for tone, not as a separate topic to discuss.
 
+Regardless of any sentiment context provided, NEVER describe or infer a founder response, tone, or behavior that is not explicitly present in the [Founder] lines of the transcript. If a turn has no [Founder] line, that turn contains no founder response — do not invent one.
+
 The type after the colon tells you which of two distinct mechanisms caused the cut-in — use it to fix "trigger", don't guess from content when the type already answers it:
 - "hesitation_cutoff": the founder trailed off and the counterpart's turn-detection treated the pause as the end of their turn. This is not a claim, a number, or a dodge — always use trigger: "hesitation" for these.
 - "barge_in": the counterpart talked over the founder mid-sentence because of what was being said. Pick the trigger from the actual content: "vague_claim", "unsupported_number", or "ignored_question".
@@ -158,6 +160,37 @@ def parse_timeline(timeline: dict) -> list[dict]:
 
 def interruption_turns(turns: list[dict]) -> list[dict]:
     return [t for t in turns if t["is_interruption"]]
+
+
+def _no_user_speech(turns: list[dict]) -> bool:
+    """True if the founder never said anything at all — every turn's
+    user_transcript is null, empty, or whitespace-only (an empty list of
+    turns counts too: no data is no speech either). Confirmed against a
+    real call (sess_fa8d263aa9294da8866e4e8d04a3473e, see
+    zero_response_session.json): qwen3.5-4b-32k-fast hallucinated a
+    fabricated founder response and a 65-70/100 score for this exact case
+    2 times out of 3, even though the prompt's own instructions already
+    say to score near-zero here — the model just doesn't reliably follow
+    them once sentiment context makes the prompt look like a real
+    back-and-forth. This check removes the LLM from that decision
+    entirely instead of trying to prompt-engineer around it."""
+    return all(not (t.get("user_transcript") or "").strip() for t in turns)
+
+
+_ZERO_RESPONSE_RESULT = {
+    "overall_score": 0,
+    "categories": {
+        "content_substance": {"score": 0, "note": "No response was given."},
+        "composure_under_pressure": {"score": 0, "note": "No response was given."},
+        "audience_responsiveness": {"score": 0, "note": "No response was given."},
+    },
+    "interruptions": [],
+    "suggestions": ["Start by directly answering the question you were asked."],
+}
+
+
+def _zero_response_result() -> dict:
+    return copy.deepcopy(_ZERO_RESPONSE_RESULT)
 
 
 # --- timing signals -----------------------------------------------------------
@@ -427,6 +460,8 @@ def _sanitize_interruption_count(data: dict, marked_count: int) -> dict:
 def call_judge(turns: list[dict], model: str = JUDGE_MODEL,
                 sentiment_results: Optional[list[dict]] = None,
                 counterpart_description: Optional[str] = None) -> dict:
+    if _no_user_speech(turns):
+        return _zero_response_result()
     annotated = compute_timing_signals(turns)
     messages = build_judge_prompt(annotated, sentiment_results, counterpart_description)
     allowed_numbers = _extract_numbers(_dialogue_text(turns))
@@ -507,6 +542,10 @@ def run_judge_pass(session_id: str, model: str = JUDGE_MODEL, include_sentiment:
     with urllib.request.urlopen(timeline_url) as res:
         timeline = json.loads(res.read().decode())
     turns = parse_timeline(timeline)
+    if _no_user_speech(turns):
+        # Skip sentiment analysis too, not just the LLM call — there's
+        # nothing for either to add when the founder never spoke.
+        return _zero_response_result()
     counterpart_description = _counterpart_description(session)
 
     sentiment_results = None
