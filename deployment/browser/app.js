@@ -191,20 +191,18 @@ function listPersonas() {
     const option = document.createElement('option')
     option.value = p.key
     option.textContent = p.label || p.name
-    if (PERSONA_HINTS[p.key]) option.title = PERSONA_HINTS[p.key]
     select.append(option)
   })
   const surprise = document.createElement('option')
   surprise.value = 'surprise'
   surprise.textContent = '\u{1F3B2} Surprise me'
-  surprise.title = PERSONA_HINTS.surprise
   select.append(surprise)
   select.value = selectedPersona.key
-  // The select's own (closed-dropdown) tooltip mirrors whatever value is
-  // actually showing — never the resolved persona, so a "Surprise me"
-  // pick doesn't leak through a hover tooltip the dropdown itself doesn't
-  // reveal.
-  select.title = PERSONA_HINTS[select.value] || ''
+  // Always-visible, not a hover tooltip — mirrors whatever value is
+  // actually showing (select.value), never the resolved persona, so a
+  // "Surprise me" pick doesn't leak through a description the dropdown
+  // itself doesn't reveal.
+  $('persona-hint').textContent = PERSONA_HINTS[select.value] || ''
 }
 listPersonas()
 
@@ -231,7 +229,7 @@ $('persona').onchange = () => {
   }
   // Mirrors `value` (what's visibly selected), not selectedPersona — see
   // the same note in listPersonas().
-  $('persona').title = PERSONA_HINTS[value] || ''
+  $('persona-hint').textContent = PERSONA_HINTS[value] || ''
   // Refresh the sidebar's read-only agent view if it's the one showing.
   if (!$('agent-body').hidden) loadAgentTab()
 }
@@ -689,6 +687,7 @@ const LOADING_STAGES = [
 let loadingTimers = []
 let lastSessionId = null
 let lastPersona = null
+let lastResultsData = null
 
 function startLoadingStages() {
   clearLoadingStages()
@@ -715,6 +714,7 @@ function fetchJudgeResults(id, persona) {
   $('results-body').replaceChildren()
   $('results-error').hidden = true
   $('results-loading').hidden = false
+  $('results-copy').hidden = true
   startLoadingStages()
   fetch('/judge?session_id=' + encodeURIComponent(id))
     .then(async (res) => {
@@ -722,7 +722,9 @@ function fetchJudgeResults(id, persona) {
       if (!res.ok) throw new Error(data.error || 'request failed')
       clearLoadingStages()
       $('results-loading').hidden = true
+      lastResultsData = data
       renderJudgeResults(data)
+      $('results-copy').hidden = false
       saveToHistory(data, persona)
       renderProgress()
     })
@@ -735,6 +737,35 @@ function fetchJudgeResults(id, persona) {
 }
 
 $('results-retry').onclick = () => { if (lastSessionId) fetchJudgeResults(lastSessionId, lastPersona) }
+
+function formatFeedbackText(data, persona) {
+  const lines = []
+  const who = persona?.short_name || persona?.name
+  lines.push(who ? `Voxel Feedback — ${who}` : 'Voxel Feedback')
+  lines.push(`Overall: ${data.overall_score}/100`)
+  lines.push('')
+  for (const [key, cat] of Object.entries(data.categories)) {
+    lines.push(`${key.replace(/_/g, ' ')}: ${cat.score}/100`)
+    lines.push(`  ${cat.note}`)
+    lines.push('')
+  }
+  if (data.suggestions.length) {
+    lines.push('Suggestions:')
+    for (const s of data.suggestions) lines.push(`- ${s}`)
+  }
+  return lines.join('\n').trim()
+}
+
+$('results-copy').onclick = () => {
+  if (!lastResultsData) return
+  const text = formatFeedbackText(lastResultsData, lastPersona)
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = $('results-copy')
+    const original = btn.textContent
+    btn.textContent = 'Copied!'
+    setTimeout(() => { btn.textContent = original }, 1500)
+  })
+}
 
 const QUALITY_CLASS = { strong: 'quality-good', weak: 'quality-warn', poor: 'quality-bad' }
 
@@ -925,6 +956,7 @@ function renderProgress() {
     $('progress-empty').hidden = false
     $('progress-chart').hidden = true
     $('progress-note').hidden = true
+    $('progress-best').hidden = true
     if (progressChart) {
       progressChart.destroy()
       progressChart = null
@@ -936,6 +968,7 @@ function renderProgress() {
   $('progress-empty').hidden = true
   $('progress-chart').hidden = false
   $('progress-note').hidden = false
+  renderPersonalBests(filtered)
 
   // Fixed locale, not the system's — a demo machine set to a different
   // language shouldn't change what the chart's x-axis reads.
@@ -986,6 +1019,27 @@ const CATEGORY_LABELS = {
   content_substance: 'Content Substance',
   composure_under_pressure: 'Composure Under Pressure',
   audience_responsiveness: 'Audience Responsiveness',
+}
+
+// One chip per persona present in `entries` — a single chip when the
+// persona filter narrows the chart to one, several when it's "All personas".
+function renderPersonalBests(entries) {
+  const bestByPersona = new Map()
+  for (const h of entries) {
+    const current = bestByPersona.get(h.persona)
+    if (current === undefined || h.overall_score > current) bestByPersona.set(h.persona, h.overall_score)
+  }
+  const root = $('progress-best')
+  root.replaceChildren()
+  const single = bestByPersona.size === 1
+  for (const [persona, best] of bestByPersona) {
+    const chip = document.createElement('span')
+    chip.className = 'progress-best-chip'
+    const label = single ? 'Personal best' : persona
+    chip.append(`${label}: `, Object.assign(document.createElement('strong'), { textContent: best }))
+    root.append(chip)
+  }
+  root.hidden = bestByPersona.size === 0
 }
 
 function hideProgressDetail() {

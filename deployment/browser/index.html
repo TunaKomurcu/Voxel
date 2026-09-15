@@ -114,11 +114,12 @@
   @media (max-width: 880px) {
     .panes { grid-template-columns: 1fr; grid-template-rows: 1fr 176px; }
     body.no-side .panes { grid-template-rows: 1fr; }
-    /* The persona select is the one control that must never truncate its
-       selected label, so it gets its own full-width row below the title/
-       status row instead of shrinking in place. */
+    /* The persona picker (select + its always-visible hint) is the one
+       control that must never truncate its selected label, so it gets its
+       own full-width row below the title/status row instead of shrinking
+       in place. */
     header { flex-wrap: wrap; row-gap: 10px; }
-    #persona { order: 5; flex: 1 1 100%; }
+    .persona-picker { order: 5; flex: 1 1 100%; }
   }
 
   .pane { display: flex; flex-direction: column; min-height: 0;
@@ -194,6 +195,17 @@
            background: var(--surface); border: 1px solid var(--border);
            border-radius: var(--radius-sm); }
   select:disabled { color: var(--text-faint); }
+  /* Always-visible persona description — not a hover title, which never
+     shows on mobile and renders inconsistently (or not at all) across
+     desktop browsers on a closed <select>. */
+  .persona-picker { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  /* select's own `flex: 0 1 220px` sets WIDTH when it's a row-flex child —
+     but here its parent (.persona-picker) is a column flex container, so
+     that same shorthand would set HEIGHT instead. Pin width explicitly
+     and opt this one out of the flex sizing entirely. */
+  .persona-picker select { flex: none; width: 220px; }
+  .persona-hint { display: block; max-width: 220px; font-size: 11px; color: var(--text-faint);
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Text button, sized to sit inside the pane header. */
   .ghost { height: auto; margin-left: 0; padding: 0; background: transparent;
            color: var(--text-faint); font-size: 12px; letter-spacing: 1.2px; }
@@ -277,13 +289,23 @@
                             font-size: 18px; text-transform: none; letter-spacing: 0; line-height: 1; }
   .progress-detail-close:hover { color: var(--text-dark); background: transparent; }
   .progress-note { margin-top: 10px; font-size: 12px; color: var(--text-faint); }
+  /* One chip per persona currently shown on the chart — a single persona
+     when the filter narrows to one, several side by side in "All personas". */
+  .progress-best { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .progress-best-chip { font-family: var(--font-mono); font-size: 11px; letter-spacing: .4px;
+                         padding: 4px 10px; border-radius: 999px; background: var(--surface);
+                         border: 1px solid var(--border); color: var(--text-muted); }
+  .progress-best-chip strong { color: var(--text-dark); font-weight: 600; }
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>Voxel</h1>
-    <select id="persona" aria-label="Counterpart persona"></select>
+    <div class="persona-picker">
+      <select id="persona" aria-label="Counterpart persona"></select>
+      <span id="persona-hint" class="persona-hint"></span>
+    </div>
     <button class="ghost" id="log-toggle">Hide events</button>
     <span class="status idle" id="status"><span id="status-text">idle</span></span>
     <span class="meter"><span id="elapsed">0:00</span><span id="cost">$0.000</span></span>
@@ -331,7 +353,10 @@
   </div>
 
   <section class="pane" id="results" hidden>
-    <div class="pane-head"><span class="pane-title">Feedback</span></div>
+    <div class="pane-head">
+      <span class="pane-title">Feedback</span>
+      <button class="ghost" id="results-copy" hidden>Copy feedback</button>
+    </div>
     <div class="pane-body">
       <div id="results-loading"><span id="results-status">Reviewing what you said...</span></div>
       <div id="results-error" hidden>
@@ -350,6 +375,7 @@
     <div class="pane-body">
       <div id="progress-empty" class="empty">No past sessions yet — feedback from each call is saved here automatically.</div>
       <div class="chart-wrap"><canvas id="progress-chart" hidden></canvas></div>
+      <div class="progress-best" id="progress-best" hidden></div>
       <div class="progress-detail" id="progress-detail" hidden></div>
       <p class="progress-note" id="progress-note" hidden>Stored only in this browser — not sent anywhere.</p>
     </div>
