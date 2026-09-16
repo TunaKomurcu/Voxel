@@ -235,4 +235,3 @@ persona and turn-detection tuning.
 ## Explicitly out of scope for the hackathon version
 - Multi-user accounts, persistence beyond a single session.
 - Telephony / Twilio integration — browser-only is enough for the demo.
-- Multiple personas — one well-tuned investor persona beats three shallow ones.
