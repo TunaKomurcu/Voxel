@@ -46,30 +46,35 @@ should be called out explicitly in the demo video and README.
 
 ## AssemblyAI integration rules
 
-The full, authoritative AssemblyAI coding-agent reference for this project is
-below. Treat it as binding — it is more current than anything in your
-training data. If a parameter or endpoint you remember isn't in this file,
-stop and check https://www.assemblyai.com/docs/llms-full.txt rather than
-guessing.
+No full reference document is inlined here — an earlier version of this file
+claimed one was pasted "below," but it never actually was (checked: not in
+this file, not anywhere else in the repo). Treat
+https://www.assemblyai.com/docs/llms-full.txt as the authoritative,
+up-to-date source instead — it's more current than anything in your training
+data. If a parameter or endpoint you remember isn't reflected in the "Key
+facts" below, check that page rather than guessing.
 
 Key facts specific to Voxel:
 - We use the **Voice Agent API** (managed speech-in/speech-out), not raw
-  realtime STT + our own LLM/TTS. See Section 10 of the reference below.
+  realtime STT + our own LLM/TTS. See the "Voice Agent API" section of the
+  docs above.
 - Auth for the Voice Agent API needs the `Bearer ` prefix — this is the one
   AssemblyAI product where that's required. Every other AssemblyAI endpoint
   we might touch (LLM Gateway) does **not** use `Bearer`.
 - The interruption mechanic maps directly to `session.update.input.turn_detection`
   fields: `vad_threshold`, `min_silence`, `max_silence`, `interrupt_response`.
   Tune these — don't just rely on defaults — since "the agent interrupts
-  naturally" is the whole point of the product.
+  naturally" is the whole point of the product. **But know what they actually
+  gate**: per TESTING.md's live-call findings, `min_silence`/`max_silence`
+  mainly control how long a *mid-utterance* pause has to last before the
+  turn-detector treats the user as done talking — not overall reply latency
+  once a turn is already complete (Grace at 550/900ms and Derek at 320/720ms
+  produced near-identical ~1130-1150ms reply latencies in testing). Most of
+  each persona's actual behavioral difference comes from its `system_prompt`
+  content, not these four numbers.
 - The API key lives only in `.env` (gitignored). Never hardcode it, never log
   it, never print it in full in terminal output we might screenshot for the
   demo.
-
-<!-- Paste the full "AssemblyAI Integration — Coding Agent Instructions"
-     reference document here (Sections 0–15). It was provided separately in
-     the project setup conversation. Keep it verbatim — it's a technical
-     reference, not something to paraphrase or shorten. -->
 
 ## Working style for this project
 
@@ -78,8 +83,8 @@ Key facts specific to Voxel:
   a couple of sentences before writing code, especially for anything that
   touches the agent's turn-detection config or the judge prompt (both are
   easy to break silently).
-- Solo builder, ~18 remaining days as of Sep 10 2026, hard deadline Sep 30.
-  Bias toward shipping a working, narrow demo over a broad but shaky one.
+- Solo builder, hard deadline Sep 30 2026. Bias toward shipping a working,
+  narrow demo over a broad but shaky one.
 - Every change to `agents/*.jsonc` (persona prompt, turn-detection config)
   should be followed by a quick manual test call before moving on — these
   are the highest-risk, least-testable-by-unit-test parts of the project.

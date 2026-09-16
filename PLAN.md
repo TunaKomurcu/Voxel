@@ -54,24 +54,24 @@ choice, not a placeholder; the retry + sanitize safety net in `call_judge()`
 The UI in Phase 3 is built against this schema, so the schema has to be
 right first.
 
-- [ ] Expand the judge schema from a single score to three categories:
+- [x] Expand the judge schema from a single score to three categories:
       `content_substance`, `composure_under_pressure`,
       `audience_responsiveness` (each `{score: 0-100, note}`).
-- [ ] Add `trigger` and `recovery_pattern` to each interruption, both
+- [x] Add `trigger` and `recovery_pattern` to each interruption, both
       validated against a fixed enum (not free text):
       `trigger`: `vague_claim | unsupported_number | hesitation | ignored_question`
       `recovery_pattern`: `answered_directly | deflected | repeated_claim | asked_clarifying_question`
-- [ ] Add `better_response_example` per interruption — one sentence, must
+- [x] Add `better_response_example` per interruption — one sentence, must
       reference something specific from that actual conversation (a claim,
       a number). The prompt explicitly bans generic advice
       ("be more specific" and the like).
-- [ ] Compute timing signals per interruption from the timeline's existing
+- [x] Compute timing signals per interruption from the timeline's existing
       turn-level timestamps (no word-level timestamps exist in the
       timeline) — `response_latency_ms` (gap between the interruption
       ending and the user speaking again) and `words_per_second` before vs.
       after the interruption — and hand them to the judge as raw context;
       the judge interprets them, we don't.
-- [ ] Run AssemblyAI's sentiment analysis (`sentiment_analysis: true` on
+- [x] Run AssemblyAI's sentiment analysis (`sentiment_analysis: true` on
       the classic pre-recorded transcription API, not the Voice Agent API)
       against the session's recording, and pass the sentence-level results
       to the judge as context. Timestamps don't line up across the two
