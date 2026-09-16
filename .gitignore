@@ -3,3 +3,4 @@ node_modules/
 agents/*.env
 __pycache__/
 *.pyc
+tests/self_play_transcripts/
