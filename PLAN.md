@@ -213,6 +213,15 @@ persona and turn-detection tuning.
       `audience_responsiveness: 20`) to 30, now consistent with the other
       two categories (20/15 on re-run). No new `interruption_type` needed.
 
+## Backlog (not blocking Phase 5)
+- Call-closing behavior: none of the four `agents/*.jsonc` prompts say
+  anything about how the persona should behave when time/the call is
+  ending (e.g. wrapping up, a closing line). Identified during the
+  system-prompt audit (2026-09-16) alongside the claim-piling and
+  pushback gaps (both since fixed) — deprioritized because a demo/judge
+  call is short and scripted enough that this edge is unlikely to come
+  up in practice.
+
 ## Phase 5 — Demo & submission (Days 18–20)
 - [ ] Record a 2–3 min demo video: show an interruption happening live, then
       the resulting feedback screen. Call out explicitly that the
