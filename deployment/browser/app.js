@@ -249,6 +249,25 @@ $('log-toggle').onclick = () => {
   $('log-toggle-label').textContent = hidden ? 'Show events' : 'Hide events'
 }
 
+// Purely visual: flips data-theme + persists it, independent of the
+// system-preference media query. See the FOUC-prevention script in
+// index.html's <head> for how a saved choice survives a reload without
+// flashing the wrong theme first — this only ever runs after a click.
+const THEME_KEY = 'voxel-theme'
+function currentTheme() {
+  const explicit = document.documentElement.getAttribute('data-theme')
+  if (explicit === 'light' || explicit === 'dark') return explicit
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+$('theme-toggle').onclick = () => {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark'
+  document.documentElement.setAttribute('data-theme', next)
+  try { localStorage.setItem(THEME_KEY, next) } catch (e) {}
+  // Chart.js bakes colors in at creation time (see cssVar() below) — a
+  // live theme flip needs an explicit re-render to pick up the new ones.
+  if (progressChart) renderProgress()
+}
+
 // --- side pane tabs ---
 // Purely visual: dims punctuation/structure and picks out keys, strings,
 // and literals so the raw agent JSON reads lighter without hiding any of

@@ -2,6 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- Runs before any CSS paints, so a saved manual theme choice never
+     flashes the system-preference theme first. Kept tiny and inline
+     (no external file, no defer) specifically to block synchronously
+     here, before <style> below is even parsed. -->
+<script>
+(function () {
+  try {
+    var saved = localStorage.getItem('voxel-theme');
+    if (saved === 'light' || saved === 'dark') {
+      document.documentElement.setAttribute('data-theme', saved);
+    }
+  } catch (e) {}
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light dark">
 <title>Voxel</title>
@@ -20,6 +34,7 @@
      not bundled here, so each falls back the same way the site's own stack
      does: Georgia for display, system-ui for body, JetBrains Mono for mono. */
   :root {
+    color-scheme: light;
     --page-bg: #fdfcf8;
     --surface: #fff;
     --surface-alt: #f5f3eb;
@@ -27,10 +42,23 @@
     --border-strong: #c7c3b2;
     --text: #4a4945;
     --text-dark: #1d1b16;
-    --text-muted: #777673;
-    --text-faint: #a5a4a2;
+    /* Both darkened from #777673 (4.42:1 on --page-bg — under WCAG AA, and
+       weaker than dark theme's equivalent tier at 6.17:1) and #a5a4a2
+       (2.49:1 — used for real content like .who speaker labels and
+       .persona-hint, not just decoration, so this was a real problem, not
+       a rounding nitpick). Light theme had never been independently
+       measured the way dark theme was; these now do: verified via
+       getComputedStyle against both --surface and --page-bg. */
+    --text-muted: #656460;
+    --text-faint: #737270;
     --cobolt-500: #3923c7;
-    --cobolt-300: #887bdd;
+    /* Was #887bdd (a pastel lavender) — button:hover puts white text on
+       this, and #887bdd only measures ~3.55:1, below WCAG AA's 4.5:1.
+       Dark theme avoids this by darkening its hover variant instead of
+       lightening it (see its own comment below); this is the light-theme
+       equivalent — a modest lift off --cobolt-500 that still measures
+       ~7.5:1 with white, verified via getComputedStyle. */
+    --cobolt-300: #4a33db;
     --cobolt-100: #d7d3f4;
     --cobolt-glow: rgba(57, 35, 199, .35);
     --green-500: #01762f;
@@ -53,16 +81,24 @@
     --error-hover: #f4695f;
     --radius-sm: 4px;
     --radius-lg: 12px;
-    /* Resting elevation for .pane/.intro — a tight contact shadow plus a
-       soft ambient one, warm-neutral (not pure black) to sit right on the
-       cream page background. */
-    --shadow-pane: 0 1px 2px rgba(29, 27, 22, .05), 0 6px 20px rgba(29, 27, 22, .06);
+    /* Resting elevation for .pane/.intro. Light theme wants a classic,
+       fairly defined "lifted card" drop-shadow (tighter blur, a bit more
+       opacity) since there's no glow to lean on the way dark theme's
+       softer/more diffuse version does — warm-neutral (not pure black) to
+       sit right on the cream page background. */
+    --shadow-pane: 0 1px 3px rgba(29, 27, 22, .09), 0 4px 12px rgba(29, 27, 22, .08);
     --font-display: "Sora", "Oceanic Text", Georgia, serif;
     --font-body: "UN 11ST", system-ui, -apple-system, sans-serif;
     --font-mono: "Modern Gothic Mono", "JetBrains Mono", ui-monospace, monospace;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    /* :not([data-theme="light"]) — an explicit manual "light" choice must
+       win even when the OS itself prefers dark. See the matching explicit
+       :root[data-theme="dark"] block after this media query, which covers
+       the opposite case (OS light, manual "dark" chosen): same values,
+       just not gated on system preference at all. */
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
       --page-bg: #17161a;
       --surface: #201f24;
       /* Lightened from #2a282f — the two were only 1.12:1 apart, so pane
@@ -104,6 +140,33 @@
          faint ambient falloff. */
       --shadow-pane: 0 1px 2px rgba(0, 0, 0, .35), 0 6px 20px rgba(0, 0, 0, .18);
     }
+  }
+  /* Same values as the media query above, for when the OS prefers light
+     but the user has explicitly picked dark via the toggle. */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page-bg: #17161a;
+    --surface: #201f24;
+    --surface-alt: #302e36;
+    --border: #3a383f;
+    --border-strong: #4c4a52;
+    --text: #cfccc5;
+    --text-dark: #f3f1ec;
+    --text-muted: #9a978f;
+    --text-faint: #8c8984;
+    --cobolt-500: #6654eb;
+    --cobolt-300: #4a34e8;
+    --cobolt-100: #332f5c;
+    --cobolt-glow: rgba(102, 84, 235, .45);
+    --green-500: #3ddc84;
+    --green-glow: rgba(61, 220, 132, .45);
+    --orb-idle-edge: var(--surface-alt);
+    --orb-idle-glow: rgba(102, 84, 235, .18);
+    --grain-opacity: .045;
+    --amber-600: #f5a623;
+    --error: #d91200;
+    --error-hover: #b50f00;
+    --shadow-pane: 0 1px 2px rgba(0, 0, 0, .35), 0 6px 20px rgba(0, 0, 0, .18);
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { height: 100%; }
@@ -361,6 +424,20 @@
      icon automatically matches whatever text color its button/state has. */
   .icon { width: 14px; height: 14px; flex-shrink: 0; fill: none; stroke: currentColor;
           stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+  /* Shows the icon for the theme a click would SWITCH TO, not the current
+     one — moon (switch to dark) visible at rest/light, sun (switch to
+     light) visible once dark. Same three-way cascade as the color tokens
+     themselves (base = light, media query = system dark, [data-theme] =
+     manual override) so this never drifts out of sync with what's
+     actually rendered. */
+  #theme-toggle .icon-sun { display: none; }
+  #theme-toggle .icon-moon { display: block; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) #theme-toggle .icon-sun { display: block; }
+    :root:not([data-theme="light"]) #theme-toggle .icon-moon { display: none; }
+  }
+  :root[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
+  :root[data-theme="dark"] #theme-toggle .icon-moon { display: none; }
   /* Progress panel's empty state only — Transcript/Events keep the plain
      one-line .empty treatment above, this one's a mini "nothing here yet"
      card since it's the panel most likely to read as broken/unfinished
@@ -616,6 +693,15 @@
     <button class="ghost" id="log-toggle">
       <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
       <span id="log-toggle-label">Hide events</span>
+    </button>
+    <!-- No JS needed to pick the right glyph: both icons are always in the
+         DOM, and which one is visible follows the exact same
+         data-theme/prefers-color-scheme rules as the tokens above (see
+         .theme-toggle rules) — click just flips data-theme + localStorage,
+         same pattern as every other state-driven visual in this app. -->
+    <button class="ghost" id="theme-toggle" aria-label="Switch color theme">
+      <svg class="icon icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      <svg class="icon icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
     <span class="status idle" id="status"><span id="status-text">idle</span></span>
     <span class="meter"><span id="elapsed">0:00</span><span id="cost">$0.000</span></span>
