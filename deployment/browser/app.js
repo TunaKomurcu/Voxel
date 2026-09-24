@@ -241,6 +241,7 @@ $('persona').onchange = () => {
   replayAnimation($('persona-hint'), 'flash')
   // Refresh the sidebar's read-only agent view if it's the one showing.
   if (!$('agent-body').hidden) loadAgentTab()
+  clearConversation()
 }
 
 $('btn').onclick = () => (ws?.readyState <= 1 ? stop() : start())
@@ -359,7 +360,7 @@ async function start() {
   $('mic').disabled = true
   $('persona').disabled = true
   setStatus('connecting')
-  hideResults()
+  clearConversation()
 
   try {
     // The API key never reaches the page; this token expires in 60 seconds.
@@ -668,6 +669,19 @@ function addLine(who, text) {
 function clearPartials() {
   for (const who of Object.keys(partialEl)) dropPartial(who)
   liveReply = printedReply = null
+}
+
+// Resets the transcript and feedback panes to their pre-call state — used
+// both when switching personas and when starting a new call, so neither
+// leaves the previous call's conversation or score on screen. Progress is
+// untouched: it's a persistent history, not part of "the current call".
+function clearConversation() {
+  clearPartials()
+  const empty = document.createElement('div')
+  empty.className = 'empty'
+  empty.textContent = 'Start the call and talk. Partial transcripts appear as they stream, and tool calls show up inline.'
+  $('transcript').replaceChildren(empty)
+  hideResults()
 }
 
 // --- event log ---
