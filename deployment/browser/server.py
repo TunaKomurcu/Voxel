@@ -258,6 +258,8 @@ def main() -> None:
             print(f"Persona: {p['label']} -> {p['id']}")
 
     debrief_on = debrief.is_enabled()
+    if debrief_on:
+        debrief.client()
     print("Spoken debrief: " + ("on (ElevenLabs)" if debrief_on
                                 else "off (needs ELEVENLABS_API_KEY and `pip install elevenlabs`)"))
 

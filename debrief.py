@@ -11,6 +11,7 @@ second LLM call: no extra latency, nothing to hallucinate, and the word cap
 is guaranteed rather than requested.
 """
 
+import functools
 import importlib.util
 import os
 from typing import Iterator, Optional
@@ -105,13 +106,20 @@ def describe_error(err: Exception) -> str:
     return f"HTTP {status}: {message}"
 
 
+@functools.lru_cache(maxsize=1)
+def client():
+    """One client for the server's lifetime: its connection pool keeps TLS to
+    ElevenLabs warm between debriefs. server.py builds it at startup so the
+    SDK import isn't paid on the first click either."""
+    from elevenlabs.client import ElevenLabs
+
+    return ElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
+
+
 def stream_audio(text: str, voice_id: str) -> Iterator[bytes]:
     """MP3 chunks as ElevenLabs produces them. Lazy: the HTTP request goes out
     on the first next(), so that's where auth/voice errors surface."""
-    from elevenlabs.client import ElevenLabs
-
-    client = ElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
-    return client.text_to_speech.stream(
+    return client().text_to_speech.stream(
         voice_id, text=text, model_id=MODEL_ID, output_format=OUTPUT_FORMAT,
     )
 
