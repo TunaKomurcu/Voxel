@@ -73,7 +73,9 @@ def build_debrief_text(evaluation: dict, speaker: Optional[str] = None,
     interruptions = evaluation.get("interruptions") or []
     if interruptions:
         recovered = sum(1 for i in interruptions if i.get("recovery_quality") == "strong")
-        pieces["recovery"] = f"You recovered well from {recovered} of {len(interruptions)} interruptions."
+        count = len(interruptions)
+        pieces["recovery"] = (f"You recovered well from {recovered} of {count} "
+                              f"interruption{'' if count == 1 else 's'}.")
 
     suggestions = [s for s in evaluation.get("suggestions") or [] if str(s).strip()]
     if suggestions:
@@ -89,6 +91,18 @@ def build_debrief_text(evaluation: dict, speaker: Optional[str] = None,
 
     order = ("recovery", "strong", "weak", "tip")
     return " ".join([head] + [pieces[n] for n in order if n in kept])
+
+
+def describe_error(err: Exception) -> str:
+    """One line for the server log. The SDK's ApiError str() includes every
+    response header, which buries the part that matters."""
+    status = getattr(err, "status_code", None)
+    if status is None:
+        return f"{type(err).__name__}: {err}"
+    body = getattr(err, "body", None)
+    detail = body.get("detail", body) if isinstance(body, dict) else body
+    message = detail.get("message", detail) if isinstance(detail, dict) else detail
+    return f"HTTP {status}: {message}"
 
 
 def stream_audio(text: str, voice_id: str) -> Iterator[bytes]:

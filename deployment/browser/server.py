@@ -181,7 +181,7 @@ class Handler(BaseHTTPRequestHandler):
             chunks = debrief.stream_audio(text, debrief.voice_for(key))
             first = next(chunks, b"")
         except Exception as err:
-            print(f"Debrief TTS failed ({key}): {type(err).__name__}: {err}")
+            print(f"Debrief TTS failed ({key}): {debrief.describe_error(err)}")
             self._send(502, b'{"error":"debrief unavailable"}', "application/json")
             return
         first_ms = (time.perf_counter() - started) * 1000
@@ -210,7 +210,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as err:
             # Headers are already out, so all that's left is to cut the
             # response short; the page treats a broken body as a failure.
-            print(f"Debrief TTS failed mid-stream ({key}): {type(err).__name__}: {err}")
+            print(f"Debrief TTS failed mid-stream ({key}): {debrief.describe_error(err)}")
             self.close_connection = True
             return
         total_ms = (time.perf_counter() - started) * 1000
