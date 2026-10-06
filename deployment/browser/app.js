@@ -780,6 +780,7 @@ function clearLoadingStages() {
 
 function hideResults() {
   clearLoadingStages()
+  resetDebrief()
   $('results').hidden = true
 }
 
@@ -791,6 +792,7 @@ function fetchJudgeResults(id, persona) {
   $('results-error').hidden = true
   $('results-loading').hidden = false
   $('results-copy').hidden = true
+  resetDebrief()
   startLoadingStages()
   fetch('/judge?session_id=' + encodeURIComponent(id))
     .then(async (res) => {
@@ -801,6 +803,7 @@ function fetchJudgeResults(id, persona) {
       lastResultsData = data
       renderJudgeResults(data)
       $('results-copy').hidden = false
+      $('results-debrief').hidden = !window.DEBRIEF_ENABLED
       saveToHistory(data, persona)
       renderProgress()
     })
@@ -841,6 +844,72 @@ $('results-copy').onclick = () => {
     label.textContent = 'Copied!'
     setTimeout(() => { label.textContent = original }, 1500)
   })
+}
+
+// --- spoken debrief ---
+// Fetched on the first click only (never autoplayed), then kept for the
+// current results so replays don't spend ElevenLabs credits again. Any
+// failure hides the button; the text feedback above is unaffected.
+let debriefAudio = null
+let debriefRequest = 0
+
+function setDebriefLabel(text) { $('results-debrief-label').textContent = text }
+
+function resetDebrief() {
+  debriefRequest++
+  if (debriefAudio) {
+    debriefAudio.pause()
+    URL.revokeObjectURL(debriefAudio.src)
+    debriefAudio = null
+  }
+  $('results-debrief').hidden = true
+  $('results-debrief').disabled = false
+  setDebriefLabel('Play debrief')
+}
+
+async function playDebrief() {
+  try {
+    await debriefAudio.play()
+    setDebriefLabel('Stop debrief')
+  } catch (err) {
+    // Some browsers refuse play() after an async fetch even inside a click.
+    // The audio is cached, so the next click plays it straight away.
+    if (err.name !== 'NotAllowedError') resetDebrief()
+  }
+}
+
+$('results-debrief').onclick = async () => {
+  if (debriefAudio && !debriefAudio.paused) {
+    debriefAudio.pause()
+    debriefAudio.currentTime = 0
+    setDebriefLabel('Play debrief')
+    return
+  }
+  if (debriefAudio) return playDebrief()
+  if (!lastResultsData) return
+  const request = ++debriefRequest
+  $('results-debrief').disabled = true
+  setDebriefLabel('Loading debrief...')
+  try {
+    const res = await fetch('/debrief', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ persona: lastPersona?.key, evaluation: lastResultsData }),
+    })
+    if (!res.ok) throw new Error('debrief request failed (' + res.status + ')')
+    const blob = await res.blob()
+    // A new call or persona switch since the click: drop this one.
+    if (request !== debriefRequest) return
+    debriefAudio = new Audio(URL.createObjectURL(blob))
+    debriefAudio.onended = () => setDebriefLabel('Play debrief')
+    debriefAudio.onerror = resetDebrief
+    $('results-debrief').disabled = false
+    setDebriefLabel('Play debrief')
+    await playDebrief()
+  } catch (err) {
+    console.warn('Spoken debrief unavailable:', err)
+    if (request === debriefRequest) resetDebrief()
+  }
 }
 
 const QUALITY_CLASS = { strong: 'quality-good', weak: 'quality-warn', poor: 'quality-bad' }

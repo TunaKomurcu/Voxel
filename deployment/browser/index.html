@@ -560,6 +560,7 @@
            color: var(--text-faint); font-size: 12px; letter-spacing: 1.2px; }
   .ghost:hover:not(:disabled) { background: transparent; color: var(--cobolt-500); }
   .tabs { display: flex; gap: 16px; }
+  .pane-actions { display: flex; gap: 16px; }
   .tab.on { color: var(--text-dark); }
 
   /* Read-only view of the agent as the API stored it. */
@@ -775,10 +776,17 @@
   <section class="pane" id="results" hidden>
     <div class="pane-head">
       <span class="pane-title">Feedback</span>
-      <button class="ghost" id="results-copy" hidden>
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        <span id="results-copy-label">Copy feedback</span>
-      </button>
+      <div class="pane-actions">
+        <!-- Only shown when server.py has ElevenLabs configured; never autoplays. -->
+        <button class="ghost" id="results-debrief" hidden>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>
+          <span id="results-debrief-label">Play debrief</span>
+        </button>
+        <button class="ghost" id="results-copy" hidden>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span id="results-copy-label">Copy feedback</span>
+        </button>
+      </div>
     </div>
     <div class="pane-body">
       <div id="results-loading"><span id="results-status">Reviewing what you said...</span></div>
@@ -818,7 +826,7 @@
     </div>
   </section>
 </main>
-<script>window.PERSONAS = {{PERSONAS_JSON}}</script>
+<script>window.PERSONAS = {{PERSONAS_JSON}}; window.DEBRIEF_ENABLED = {{DEBRIEF_ENABLED}}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
 <script src="/app.js"></script>
 </body>
