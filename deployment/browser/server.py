@@ -7,9 +7,11 @@ The API key stays in this process; the page only gets 60-second tokens.
 """
 
 import copy
+import itertools
 import json
 import os
 import sys
+import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -19,6 +21,7 @@ sys.path.insert(0, str(HERE.parents[1]))
 
 from lib import (ApiError, _agents_api, aai, load_env, publish_agent, read_agent,  # noqa: E402
                  required, stored_agent_id)
+import debrief  # noqa: E402
 import judge  # noqa: E402
 
 
@@ -143,6 +146,77 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send(200, PAGE.encode(), "text/html")
 
+    def do_POST(self) -> None:  # noqa: N802
+        if urllib.parse.urlsplit(self.path).path != "/debrief" or not debrief.is_enabled():
+            self.close_connection = True  # body left unread
+            self._send(404, b'{"error":"not found"}', "application/json")
+            return
+        self._debrief()
+
+    def _debrief(self) -> None:
+        """POST {persona, evaluation} -> the spoken debrief as streamed MP3.
+        evaluation is the /judge result the browser already has, so nothing
+        is re-scored here. The first chunk is fetched before any status goes
+        out, so an ElevenLabs failure is still a clean 502 the page can hide
+        the button on."""
+        length = self.headers.get("Content-Length", "")
+        length = int(length) if length.isdigit() else 0
+        if not 0 < length <= 64 * 1024:
+            self.close_connection = True
+            self._send(400, b'{"error":"bad request"}', "application/json")
+            return
+        try:
+            payload = json.loads(self.rfile.read(length))
+            evaluation = payload["evaluation"]
+            judge.validate_judge_output(evaluation)
+        except (ValueError, KeyError, TypeError):
+            self._send(400, b'{"error":"bad evaluation"}', "application/json")
+            return
+        key = payload.get("persona")
+        entry = next((p for p in RESOLVED_PERSONAS if p["key"] == key), None)
+        text = debrief.build_debrief_text(evaluation, entry and entry["short_name"])
+
+        started = time.perf_counter()
+        try:
+            chunks = debrief.stream_audio(text, debrief.voice_for(key))
+            first = next(chunks, b"")
+        except Exception as err:
+            print(f"Debrief TTS failed ({key}): {type(err).__name__}: {err}")
+            self._send(502, b'{"error":"debrief unavailable"}', "application/json")
+            return
+        first_ms = (time.perf_counter() - started) * 1000
+        if not first:
+            print(f"Debrief TTS returned no audio ({key})")
+            self._send(502, b'{"error":"debrief unavailable"}', "application/json")
+            return
+
+        total = 0
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/mpeg")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            for chunk in itertools.chain((first,), chunks):
+                if not chunk:
+                    continue
+                self.wfile.write(b"%x\r\n%s\r\n" % (len(chunk), chunk))
+                total += len(chunk)
+            self.wfile.write(b"0\r\n\r\n")
+        except OSError as err:
+            print(f"Client disconnected during debrief: {err}")
+            self.close_connection = True
+            return
+        except Exception as err:
+            # Headers are already out, so all that's left is to cut the
+            # response short; the page treats a broken body as a failure.
+            print(f"Debrief TTS failed mid-stream ({key}): {type(err).__name__}: {err}")
+            self.close_connection = True
+            return
+        total_ms = (time.perf_counter() - started) * 1000
+        print(f"Debrief ({key or 'default'}): {len(text.split())} words, "
+              f"first audio byte {first_ms:.0f} ms, {total} bytes in {total_ms:.0f} ms")
+
     def log_message(self, *args) -> None:  # quiet; errors are printed above
         pass
 
@@ -183,8 +257,13 @@ def main() -> None:
         for p in RESOLVED_PERSONAS:
             print(f"Persona: {p['label']} -> {p['id']}")
 
+    debrief_on = debrief.is_enabled()
+    print("Spoken debrief: " + ("on (ElevenLabs)" if debrief_on
+                                else "off (needs ELEVENLABS_API_KEY and `pip install elevenlabs`)"))
+
     PAGE = ((HERE / "index.html").read_text(encoding="utf-8")
-            .replace("{{PERSONAS_JSON}}", json.dumps(RESOLVED_PERSONAS).replace("<", "\\u003c")))
+            .replace("{{PERSONAS_JSON}}", json.dumps(RESOLVED_PERSONAS).replace("<", "\\u003c"))
+            .replace("{{DEBRIEF_ENABLED}}", json.dumps(debrief_on)))
 
     # PORT when set, otherwise 3000 and up until one is free.
     fixed = os.environ.get("PORT")
