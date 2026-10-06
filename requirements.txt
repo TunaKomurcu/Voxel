@@ -1,1 +1,3 @@
-# Standard library only. Nothing to install.
+# The app itself is standard library only. This is optional: without it (or
+# without ELEVENLABS_API_KEY) the spoken post-call debrief is simply off.
+elevenlabs>=2.0
