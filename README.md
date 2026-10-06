@@ -23,6 +23,7 @@ When the call ends, the transcript doesn't just get summarized — it goes throu
   - **Derek** — an impatient enterprise buyer focused on concrete ROI, cost, and timeline.
 - **Multi-layer post-call analysis**: the session timeline (interruption type, recovery pattern, response latency, words/sec before vs. after) is combined with sentence-level sentiment analysis from a separate transcription pass, and both are handed to the judge as context.
 - **Safety nets around the judge model**: a regex-based check strips any number in `better_response_example` that never actually appeared in the transcript (the cheap model this project uses will otherwise invent a plausible-looking $45k CAC out of nowhere), with automatic retry on invalid JSON/schema and backoff retry on `429` rate limits.
+- **Spoken debrief (optional)**: a short coach-style recap of the evaluation, read aloud on demand in the voice of the persona you just pitched to. Voice by ElevenLabs.
 - **Progress tracking**: past sessions' scores are saved locally and charted over time, per persona.
 - **Self-play test infrastructure**: `tests/self_play.py` runs the four real persona prompts against seven synthetic founder behavior profiles entirely through the LLM Gateway (no audio, no Voice Agent API), to catch persona-consistency regressions cheaply before a live call.
 
@@ -70,6 +71,20 @@ python deployment/browser/server.py
 
 Open http://localhost:3000, pick a persona, and start the call.
 
+### Spoken debrief (optional)
+
+After the feedback appears, a **Play debrief** button reads a summary of up to 60 words aloud: score, weakest area, one next-time tip. It uses [ElevenLabs](https://elevenlabs.io) text-to-speech (`eleven_flash_v2_5`, streamed) in the persona's own voice. It runs strictly after the call, so the Voice Agent session, turn detection and the judge pass are unchanged.
+
+```sh
+pip install -r requirements.txt     # the elevenlabs SDK, only needed for this
+# .env
+ELEVENLABS_API_KEY=your_key_here
+```
+
+Without the key (or the package) the button never appears and everything else works as before. Persona → voice ids live in one map, `DEBRIEF_VOICES` in `debrief.py`. The server logs time-to-first-audio-byte for each debrief.
+
+**Voice by ElevenLabs.**
+
 ## Running tests
 
 ```sh
@@ -77,7 +92,7 @@ pip install -r requirements-dev.txt   # pytest only, dev-only
 pytest tests/ -q
 ```
 
-64 tests, covering timeline parsing, the judge's output schema, hallucination/rate-limit safety nets, and a handful of recorded edge-case sessions (very short calls, zero interruptions, mid-sentence hesitation).
+69 tests, covering timeline parsing, the judge's output schema, hallucination/rate-limit safety nets, and a handful of recorded edge-case sessions (very short calls, zero interruptions, mid-sentence hesitation).
 
 `tests/self_play.py` is separate from the pytest suite — it's a standalone script that generates synthetic founder-vs-persona conversations through the LLM Gateway to check persona consistency without needing a live microphone. See its docstring for usage (`python tests/self_play.py --run`).
 
@@ -86,6 +101,7 @@ pytest tests/ -q
 ```
 lib.py                    Shared plumbing: .env, agent files, AssemblyAI + Twilio API calls
 judge.py                  Session/timeline retrieval, interruption detection, the judge pass
+debrief.py                Optional spoken debrief: persona voice map, debrief text, ElevenLabs stream
 publish.py                Publish a single agents/*.jsonc file (legacy single-agent flow)
 import_agent.py           Pull an existing agent down into a agents/*.jsonc file
 agents/                   One JSON(C) file per agent — the four personas plus starter examples
@@ -98,8 +114,9 @@ See [PLAN.md](PLAN.md) for the day-by-day development process and [TESTING.md](T
 
 ## Tech stack
 
-- **Backend**: Python, standard library only (no framework, no ORM, no pip dependencies outside of `pytest` for tests).
+- **Backend**: Python, standard library only (no framework, no ORM; the only pip dependency is the optional `elevenlabs` SDK for the spoken debrief, plus `pytest` for tests).
 - **Voice + LLM**: AssemblyAI Voice Agent API and LLM Gateway.
+- **Spoken debrief (optional)**: ElevenLabs text-to-speech via the `elevenlabs` Python SDK.
 - **Frontend**: vanilla JS/HTML/CSS, [Chart.js](https://www.chartjs.org/) for the progress graph.
 - **Hosting**: Render (free tier).
 
